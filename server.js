@@ -4,6 +4,7 @@ const cors = require('cors');
 const waiverRoutes = require('./routes/waiverRoutes');
 const authRoutes = require('./routes/authRoutes');
 const staffRoutes = require('./routes/staffRoutes');
+
 require('dotenv').config();
 
 const app = express();
@@ -20,6 +21,8 @@ app.use('/api/auth', authRoutes);
 
 
 app.use('/api/staff', staffRoutes);
+
+
 
 
 

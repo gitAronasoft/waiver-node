@@ -691,7 +691,8 @@ router.get('/waiver-details/:id', (req, res) => {
     SELECT 
       c.first_name, c.last_name, 
       DATE_FORMAT(w.signed_at, '%b %d, %Y at %h:%i %p') AS date,
-      s.name AS markedBy
+      s.name AS markedBy, 
+      signature_image
     FROM waiver_forms w
     JOIN customers c ON c.id = w.user_id
     LEFT JOIN staff s ON s.id = w.staff_id
@@ -714,7 +715,8 @@ router.get('/waiver-details/:id', (req, res) => {
         const waiverHistory = waiverRows.map(row => ({
           name: `${row.first_name} ${row.last_name}`,
           date: row.date,
-          markedBy: row.markedBy || ""
+          markedBy: row.markedBy || "",
+           signature_image: row.signature_image || ""
         }));
 
         res.json({
