@@ -1,20 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db/connection');
+const db = require('../db/connection'); // pool.promise() from your db config
 
 // ✅ Send OTP to existing customer
-router.post('/send-otp', (req, res) => {
+router.post('/send-otp', async (req, res) => {
   const { phone } = req.body;
 
   if (!phone) {
     return res.status(400).json({ message: 'Phone number is required' });
   }
 
-  // Check if customer exists
-  const checkQuery = 'SELECT * FROM customers WHERE cell_phone = ?';
-  db.query(checkQuery, [phone], (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-
+  try {
+    // Check if customer exists
+    const [results] = await db.query('SELECT * FROM customers WHERE cell_phone = ?', [phone]);
     if (results.length === 0) {
       return res.status(404).json({ message: 'Customer not found' });
     }
@@ -24,30 +22,31 @@ router.post('/send-otp', (req, res) => {
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
 
     // Store OTP in DB
-    const insertQuery = 'INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)';
-    db.query(insertQuery, [phone, otp, expiresAt], (err2) => {
-      if (err2) return res.status(500).json({ error: err2.message });
+    await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [phone, otp, expiresAt]);
 
-      console.log(`✅ OTP for ${phone} is: ${otp}`); // Replace with SMS service in production
-
-      //return res.json({ message: 'OTP sent successfully' });
-      return res.json({ message: `✅ OTP for ${phone} is: ${otp}` });
-    });
-  });
+    console.log(`✅ OTP for ${phone} is: ${otp}`); // Replace with SMS API in production
+    //return res.json({ message: `✅ OTP sent successfully`, otp });
+    return res.json({ message: `✅ OTP sent successfully: ${otp}` }); 
+  } catch (error) {
+    console.error('Error in /send-otp:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // ✅ Verify OTP
-router.post('/verify-otp', (req, res) => {
+router.post('/verify-otp', async (req, res) => {
   const { phone, otp } = req.body;
 
   if (!phone || !otp) {
     return res.status(400).json({ message: 'Phone and OTP are required' });
   }
 
-  // Get latest OTP for this phone
-  const query = 'SELECT * FROM otps WHERE phone = ? ORDER BY created_at DESC LIMIT 1';
-  db.query(query, [phone], (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    // Get latest OTP for this phone
+    const [results] = await db.query(
+      'SELECT * FROM otps WHERE phone = ? ORDER BY created_at DESC LIMIT 1',
+      [phone]
+    );
 
     if (results.length === 0) {
       return res.status(400).json({ message: 'No OTP found for this phone' });
@@ -63,11 +62,14 @@ router.post('/verify-otp', (req, res) => {
       return res.status(400).json({ message: 'OTP has expired' });
     }
 
-    // Delete used OTP
-    // db.query('DELETE FROM otps WHERE id = ?', [savedOtp.id]);
+    // Optionally delete OTP after verification
+    // await db.query('DELETE FROM otps WHERE id = ?', [savedOtp.id]);
 
     return res.json({ message: 'OTP verified successfully', authenticated: true });
-  });
+  } catch (error) {
+    console.error('Error in /verify-otp:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 module.exports = router;

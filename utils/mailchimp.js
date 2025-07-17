@@ -5,7 +5,17 @@ const MAILCHIMP_API_KEY = process.env.MAILCHIMP_API_KEY;
 const LIST_ID = process.env.MAILCHIMP_LIST_ID;
 const DATACENTER = process.env.MAILCHIMP_DC;
 
-const addToMailchimp = async (email, phone) => {
+/**
+ * Add a user to Mailchimp list with additional fields
+ * @param {string} email
+ * @param {string} phone
+ * @param {string} first_name
+ * @param {string} last_name
+ * @param {string} dob
+ * @param {string} city
+ * @param {string} address
+ */
+const addToMailchimp = async (email, phone, first_name, last_name, dob, city, address) => {
   try {
     const response = await axios.post(
       `https://${DATACENTER}.api.mailchimp.com/3.0/lists/${LIST_ID}/members`,
@@ -13,12 +23,12 @@ const addToMailchimp = async (email, phone) => {
         email_address: email,
         status: "subscribed",
         merge_fields: {
-           PHONE: cell_phone,
+          PHONE: phone,
           FNAME: first_name,
           LNAME: last_name,
           DOB: dob,
           CITY: city,
-          ADDRESS:address
+          ADDRESS: address
         },
         tags: ["waiver-visit", new Date().toISOString().split('T')[0]]
       },
@@ -30,7 +40,7 @@ const addToMailchimp = async (email, phone) => {
       }
     );
 
-    console.log("Mailchimp success:", response.data.id);
+    console.log("✅ Mailchimp success:", response.data.id);
   } catch (err) {
     if (err.response && err.response.status === 400) {
       console.log("Mailchimp Error:", err.response.data.detail);
