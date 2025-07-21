@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
+const authenticateToken = require("../middleware/auth"); // JWT Auth Middleware
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -195,32 +196,187 @@ router.post('/update-password', async (req, res) => {
   }
 });
 
-// Get admin details
-router.get('/getadmin/:id', async (req, res) => {
-  const { id } = req.params;
+// Change Password
+// Change Password for logged-in staff
+router.post("/change-password", async (req, res) => {
+  const { id, email, currentPassword, newPassword, confirmPassword } = req.body;
+
+  if (!id || !email) return res.status(400).json({ error: "Invalid request. Missing user details." });
+  if (!currentPassword || !newPassword || !confirmPassword)
+    return res.status(400).json({ error: "All fields are required." });
+  if (newPassword !== confirmPassword)
+    return res.status(400).json({ error: "New password and confirm password do not match." });
+
+  // Validate password strength
+  const hasUpperCase = /[A-Z]/.test(newPassword);
+  const hasLowerCase = /[a-z]/.test(newPassword);
+  const hasNumber = /[0-9]/.test(newPassword);
+  const minLength = newPassword.length >= 8;
+
+  if (!hasUpperCase || !hasLowerCase || !hasNumber || !minLength) {
+    return res.status(400).json({
+      error: "Password must be at least 8 characters long and include uppercase, lowercase, and a number.",
+    });
+  }
 
   try {
-    const [results] = await db.query('SELECT * FROM admins WHERE id = ?', [id]);
-    if (results.length === 0) return res.status(404).json({ error: 'Admin not found' });
-    res.json(results[0]);
+    // Find staff by ID & Email
+    db.query("SELECT * FROM staff WHERE id = ? AND email = ?", [id, email], async (err, results) => {
+      if (err) return res.status(500).json({ error: "Database error." });
+      if (results.length === 0) return res.status(404).json({ error: "Staff not found." });
+
+      const staff = results[0];
+
+      // Check current password
+      const isMatch = await bcrypt.compare(currentPassword, staff.password);
+      if (!isMatch) return res.status(400).json({ error: "Current password is incorrect." });
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password
+      db.query("UPDATE staff SET password = ? WHERE id = ?", [hashedPassword, id], async (updateErr) => {
+        if (updateErr) return res.status(500).json({ error: "Failed to update password." });
+
+        // Generate new token
+        const jwt = require("jsonwebtoken");
+        const JWT_SECRET = process.env.JWT_SECRET;
+        const token = jwt.sign({ id: staff.id, email: staff.email }, JWT_SECRET, { expiresIn: "1d" });
+
+        return res.json({
+          message: "Password updated successfully.",
+          token,
+          staff: {
+            id: staff.id,
+            email: staff.email,
+            name: staff.name,
+          },
+        });
+      });
+    });
   } catch (err) {
-    console.error('Getadmin error:', err);
-    res.status(500).json({ error: 'Database error' });
+    console.error("Change password error:", err);
+    res.status(500).json({ error: "Server error." });
   }
 });
 
-// Update admin profile
-router.put('/admin/:id', async (req, res) => {
-  const { id } = req.params;
-  const { name, email, phone } = req.body;
 
+
+// Get all staff members (excluding admin)
+router.get('/getstaff', async (req, res) => {
   try {
-    await db.query('UPDATE admins SET name = ?, email = ?, phone = ? WHERE id = ?', [name, email, phone, id]);
-    res.json({ message: 'Profile updated successfully' });
-  } catch (err) {
-    console.error('Admin update error:', err);
-    res.status(500).json({ error: 'Update failed' });
+    const [staff] = await db.query(
+      "SELECT id, name, email, role, status, created_at, updated_at FROM staff WHERE role != 1"
+    );
+    res.json(staff);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch staff data' });
   }
 });
+
+
+
+
+router.post("/addstaff", async (req, res) => {
+  try {
+    const { name, email, role } = req.body;
+    if (!name || !email || !role) {
+      return res.status(400).json({ error: "Name, email, and role are required" });
+    }
+
+    // Check if email already exists
+    const [existing] = await db.query("SELECT id FROM staff WHERE email = ?", [email]);
+    if (existing.length > 0) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
+
+    // Generate a temporary password
+    const tempPassword = Math.random().toString(36).slice(-8); // Example: ab12cd34
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+    // Insert staff into database
+    await db.query(
+      "INSERT INTO staff (name, email, password, role, status) VALUES (?, ?, ?, ?, ?)",
+      [name, email, hashedPassword, role, 0]
+    );
+
+    // Send invitation email
+    const loginBase = process.env.REACT_LINK_BASE || "http://localhost:3000";
+    const loginLink = `${loginBase}/admin/login`;
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.hostinger.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      tls: { rejectUnauthorized: false },
+    });
+
+    const htmlTemplate = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Welcome to Skate & Play</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 0; margin: 0;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td align="center" style="padding: 40px 0;">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #fff; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                <tr>
+                  <td style="background-color: #002244; color: white; padding: 20px; text-align: center;">
+                    <h2>Skate & Play Admin Portal</h2>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 30px;">
+                    <p>Hi ${name},</p>
+                    <p>You have been invited to join the Skate & Play admin portal as <b>${role == 1 ? "Admin" : "Staff"}</b>.</p>
+                    <p>Your login details are:</p>
+                    <ul>
+                      <li><b>Email:</b> ${email}</li>
+                      <li><b>Temporary Password:</b> ${tempPassword}</li>
+                    </ul>
+                    <p style="text-align: center; margin: 30px 0;">
+                      <a href="${loginLink}" style="background-color: #007bff; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px;">Login Now</a>
+                    </p>
+                    <p>Please change your password after first login for security purposes.</p>
+                    <p>Welcome aboard!<br/>Skate & Play Admin Team</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center; background-color: #f1f1f1; padding: 10px; font-size: 12px; color: #888;">
+                    &copy; 2025 Skate & Play. All rights reserved.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: "You're Invited to Skate & Play Admin Portal",
+      html: htmlTemplate,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.json({ message: "Staff added successfully. Invitation email sent." });
+  } catch (error) {
+    console.error("Addstaff error:", error);
+    res.status(500).json({ error: "Failed to add staff" });
+  }
+});
+
 
 module.exports = router;

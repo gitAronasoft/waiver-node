@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const addToMailchimp = require('../utils/mailchimp');
 const db = require('../db/connection'); // Uses pool.promise()
+const { getCurrentESTTime } = require('../utils/time');
 
 // ✅ GET all customers
 router.get('/', async (req, res) => {
@@ -86,28 +87,123 @@ router.get('/customer-info', async (req, res) => {
 });
 
 // ✅ Save Signature
+// router.post('/save-signature', async (req, res) => {
+//   const { id, signature, minors = [] } = req.body;
+//   if (!id || !signature) return res.status(400).json({ message: 'Missing ID or signature' });
+
+//   try {
+//     await db.query('UPDATE customers SET signature = ?, status = 1 WHERE id = ?', [signature, id]);
+
+//     const existing = minors.filter(m => !m.isNew);
+//     for (let m of existing) {
+//       await db.query('UPDATE minors SET status = ? WHERE id = ?', [m.checked ? 1 : 0, m.id]);
+//     }
+
+//     const newMinors = minors.filter(m => m.isNew && m.checked);
+//     if (newMinors.length > 0) {
+//       const insertValues = newMinors.map(m => [id, m.first_name, m.last_name, m.dob, 1]);
+//       await db.query('INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?', [insertValues]);
+//     }
+
+//     await db.query('INSERT INTO waiver_forms (user_id, signature_image) VALUES (?, ?)', [id, signature]);
+//     res.json({ message: 'Signature and waiver saved successfully' });
+//   } catch (err) {
+//     res.status(500).json({ message: 'Error saving signature', error: err.message });
+//   }
+// });
+
+
+
+// ✅ Save Signature
+// router.post('/save-signature', async (req, res) => {
+//   const { id, signature, minors = [] } = req.body;
+//   console.log(minors, 'minors');
+//   if (!id || !signature) return res.status(400).json({ message: 'Missing ID or signature' });
+
+//   try {
+//     await db.query('UPDATE customers SET signature = ?, status = 1 WHERE id = ?', [signature, id]);
+
+//     const existing = minors.filter(m => !m.isNew);
+//     for (let m of existing) {
+//       await db.query('UPDATE minors SET status = ? WHERE id = ?', [m.checked ? 1 : 0, m.id]);
+//     }
+
+//     const newMinors = minors.filter(m => m.isNew && m.checked);
+//     if (newMinors.length > 0) {
+//       const insertValues = newMinors.map(m => [id, m.first_name, m.last_name, m.dob, 1]);
+//       await db.query(
+//         'INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?',
+//         [insertValues]
+//       );
+//     }
+
+//     // Add EST signed_at
+//     const signedAtEST = getCurrentESTTime();
+//     await db.query(
+//       'INSERT INTO waiver_forms (user_id, signature_image, signed_at) VALUES (?, ?, ?)',
+//       [id, signature, signedAtEST]
+//     );
+
+//     res.json({ message: 'Signature and waiver saved successfully', signed_at: signedAtEST });
+//   } catch (err) {
+//     res.status(500).json({ message: 'Error saving signature', error: err.message });
+//   }
+// });
+
+
+// ✅ Save Signature
 router.post('/save-signature', async (req, res) => {
   const { id, signature, minors = [] } = req.body;
-  if (!id || !signature) return res.status(400).json({ message: 'Missing ID or signature' });
+  console.log(minors, 'minors');
+  if (!id || !signature)
+    return res.status(400).json({ message: 'Missing ID or signature' });
 
   try {
-    await db.query('UPDATE customers SET signature = ?, status = 1 WHERE id = ?', [signature, id]);
+    await db.query(
+      'UPDATE customers SET signature = ?, status = 1 WHERE id = ?',
+      [signature, id]
+    );
 
-    const existing = minors.filter(m => !m.isNew);
+    // Update existing minors
+    const existing = minors.filter(m => !m.isNew && m.id);
     for (let m of existing) {
-      await db.query('UPDATE minors SET status = ? WHERE id = ?', [m.checked ? 1 : 0, m.id]);
+      await db.query(
+        'UPDATE minors SET status = ?, first_name = ?, last_name = ?, dob = ? WHERE id = ?',
+        [m.checked ? 1 : 0, m.first_name, m.last_name, m.dob, m.id]
+      );
     }
 
-    const newMinors = minors.filter(m => m.isNew && m.checked);
+    // Insert new minors
+    const newMinors = minors.filter(m => (!m.id || m.isNew) && m.checked);
     if (newMinors.length > 0) {
-      const insertValues = newMinors.map(m => [id, m.first_name, m.last_name, m.dob, 1]);
-      await db.query('INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?', [insertValues]);
+      const insertValues = newMinors.map(m => [
+        id,
+        m.first_name,
+        m.last_name,
+        m.dob,
+        1,
+      ]);
+      await db.query(
+        'INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?',
+        [insertValues]
+      );
     }
 
-    await db.query('INSERT INTO waiver_forms (user_id, signature_image) VALUES (?, ?)', [id, signature]);
-    res.json({ message: 'Signature and waiver saved successfully' });
+    // Save waiver form record
+    const signedAtEST = getCurrentESTTime();
+    await db.query(
+      'INSERT INTO waiver_forms (user_id, signature_image, signed_at) VALUES (?, ?, ?)',
+      [id, signature, signedAtEST]
+    );
+
+    res.json({
+      message: 'Signature and waiver saved successfully',
+      signed_at: signedAtEST,
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Error saving signature', error: err.message });
+    res
+      .status(500)
+      .json({ message: 'Error saving signature', error: err.message });
   }
 });
 
