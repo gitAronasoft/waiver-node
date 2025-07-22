@@ -5,10 +5,76 @@ const db = require('../db/connection');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
+const multer = require("multer");
+
+const path = require("path");
 require('dotenv').config();
 const authenticateToken = require("../middleware/auth"); // JWT Auth Middleware
 
 const JWT_SECRET = process.env.JWT_SECRET;
+
+
+// Ensure the upload folder exists
+const fs = require("fs");
+const uploadDir = path.join(__dirname, "../public/uploads/profile");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Multer Storage Config
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, "profile_" + Date.now() + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage: storage });
+
+// Update Admin Profile
+router.post("/update-profile", upload.single("profileImage"), async (req, res) => {
+  const { id, name, email } = req.body;
+
+
+
+  if (!id || !name || !email) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  try {
+    let imagePath = null;
+    if (req.file) {
+      imagePath = `/uploads/profile/${req.file.filename}`;
+    }
+
+    let query = "UPDATE staff SET name = ?, email = ?";
+    const params = [name, email];
+    if (imagePath) {
+      query += ", profile_image = ?";
+      params.push(imagePath);
+    }
+    query += " WHERE id = ?";
+    params.push(id);
+
+    await db.query(query, params);
+
+    const [updatedAdmin] = await db.query(
+      "SELECT id, name, email, profile_image FROM staff WHERE id = ?",
+      [id]
+    );
+
+    return res.json({
+      message: "Profile updated successfully",
+      staff: updatedAdmin[0],
+    });
+  } catch (err) {
+  
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
 
 // Staff Login
 router.post('/login', async (req, res) => {
@@ -32,19 +98,27 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Incorrect password' });
     }
 
+    // Determine role: 1 = admin, else staff
+    const userRole = staff.role === 1 ? 'admin' : 'staff';
+
+    // Create JWT with role
     const token = jwt.sign(
-      { id: staff.id, email: staff.email, role: 'staff' },
+      { id: staff.id, email: staff.email, role: userRole },
       JWT_SECRET,
       { expiresIn: '1h' }
     );
 
+    // Send response with profile image
     res.json({
       message: 'Login successful',
       token,
       staff: {
         id: staff.id,
         name: staff.name,
-        email: staff.email
+        email: staff.email,
+        role: userRole,
+        status: staff.status,
+        profile_image: staff.profile_image || null
       }
     });
   } catch (err) {
@@ -52,6 +126,7 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 
 // Forgot Password
 router.post('/forget-password', async (req, res) => {
@@ -132,7 +207,7 @@ router.post('/forget-password', async (req, res) => {
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Password reset link sent to your email' });
   } catch (err) {
-    console.error('Forget-password error:', err);
+   
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -149,7 +224,7 @@ router.post('/reset-password/:token', async (req, res) => {
     await db.query('UPDATE staff SET password = ? WHERE email = ?', [hashedPassword, email]);
     res.json({ message: 'Password reset successfully' });
   } catch (err) {
-    console.error('Reset-password error:', err);
+    
     res.status(400).json({ message: 'Invalid or expired token' });
   }
 });
@@ -191,7 +266,7 @@ router.post('/update-password', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Update-password error:', err);
+    
     res.status(500).send('Server error.');
   }
 });
@@ -201,13 +276,17 @@ router.post('/update-password', async (req, res) => {
 router.post("/change-password", async (req, res) => {
   const { id, email, currentPassword, newPassword, confirmPassword } = req.body;
 
-  if (!id || !email) return res.status(400).json({ error: "Invalid request. Missing user details." });
+  // Basic validations
+  if (!id || !email)
+    return res.status(400).json({ error: "Invalid request. Missing user details." });
+
   if (!currentPassword || !newPassword || !confirmPassword)
     return res.status(400).json({ error: "All fields are required." });
+
   if (newPassword !== confirmPassword)
     return res.status(400).json({ error: "New password and confirm password do not match." });
 
-  // Validate password strength
+  // Password strength validation
   const hasUpperCase = /[A-Z]/.test(newPassword);
   const hasLowerCase = /[a-z]/.test(newPassword);
   const hasNumber = /[0-9]/.test(newPassword);
@@ -215,48 +294,56 @@ router.post("/change-password", async (req, res) => {
 
   if (!hasUpperCase || !hasLowerCase || !hasNumber || !minLength) {
     return res.status(400).json({
-      error: "Password must be at least 8 characters long and include uppercase, lowercase, and a number.",
+      error:
+        "Password must be at least 8 characters long and include uppercase, lowercase, and a number.",
     });
   }
 
   try {
-    // Find staff by ID & Email
-    db.query("SELECT * FROM staff WHERE id = ? AND email = ?", [id, email], async (err, results) => {
-      if (err) return res.status(500).json({ error: "Database error." });
-      if (results.length === 0) return res.status(404).json({ error: "Staff not found." });
+    // Find staff by ID and email
+    const [staffRows] = await db.query(
+      "SELECT * FROM staff WHERE id = ? AND email = ?",
+      [id, email]
+    );
 
-      const staff = results[0];
+    if (staffRows.length === 0)
+      return res.status(404).json({ error: "Staff not found." });
 
-      // Check current password
-      const isMatch = await bcrypt.compare(currentPassword, staff.password);
-      if (!isMatch) return res.status(400).json({ error: "Current password is incorrect." });
+    const staff = staffRows[0];
 
-      // Hash new password
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
+    // Check current password
+    const isMatch = await bcrypt.compare(currentPassword, staff.password);
+    if (!isMatch)
+      return res.status(400).json({ error: "Current password is incorrect." });
 
-      // Update password
-      db.query("UPDATE staff SET password = ? WHERE id = ?", [hashedPassword, id], async (updateErr) => {
-        if (updateErr) return res.status(500).json({ error: "Failed to update password." });
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-        // Generate new token
-        const jwt = require("jsonwebtoken");
-        const JWT_SECRET = process.env.JWT_SECRET;
-        const token = jwt.sign({ id: staff.id, email: staff.email }, JWT_SECRET, { expiresIn: "1d" });
+    // Update password
+    await db.query("UPDATE staff SET password = ? WHERE id = ?", [
+      hashedPassword,
+      id,
+    ]);
 
-        return res.json({
-          message: "Password updated successfully.",
-          token,
-          staff: {
-            id: staff.id,
-            email: staff.email,
-            name: staff.name,
-          },
-        });
-      });
+    // Generate new JWT token
+    const token = jwt.sign(
+      { id: staff.id, email: staff.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    return res.json({
+      message: "Password updated successfully.",
+      token,
+      staff: {
+        id: staff.id,
+        email: staff.email,
+        name: staff.name,
+      },
     });
   } catch (err) {
-    console.error("Change password error:", err);
-    res.status(500).json({ error: "Server error." });
+  
+    return res.status(500).json({ error: "Server error." });
   }
 });
 
@@ -270,7 +357,7 @@ router.get('/getstaff', async (req, res) => {
     );
     res.json(staff);
   } catch (error) {
-    console.error(error);
+   
     res.status(500).json({ error: 'Failed to fetch staff data' });
   }
 });
@@ -373,8 +460,94 @@ router.post("/addstaff", async (req, res) => {
 
     res.json({ message: "Staff added successfully. Invitation email sent." });
   } catch (error) {
-    console.error("Addstaff error:", error);
+   
     res.status(500).json({ error: "Failed to add staff" });
+  }
+});
+
+
+// Update staff status
+router.put("/update-status/:id", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (typeof status === "undefined") {
+    return res.status(400).json({ message: "Status is required" });
+  }
+
+  try {
+    const [result] = await db.query(
+      "UPDATE staff SET status = ? WHERE id = ?",
+      [status, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Staff member not found" });
+    }
+
+    res.json({ message: "Status updated successfully", id, status });
+  } catch (error) {
+   
+    res.status(500).json({ message: "Failed to update status" });
+  }
+});
+
+// Get staff details by ID
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [staff] = await db.query("SELECT * FROM staff WHERE id = ?", [id]);
+    if (staff.length === 0) return res.status(404).json({ error: "Staff not found" });
+    res.json(staff[0]);
+  } catch (error) {
+    
+    res.status(500).json({ error: "Failed to fetch staff" });
+  }
+});
+
+
+// Update staff details
+router.put("/updatestaff/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, email, role } = req.body;
+
+  if (!name || !email || !role) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  try {
+    const [result] = await db.query(
+      "UPDATE staff SET name = ?, email = ?, role = ? WHERE id = ?",
+      [name, email, role, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Staff not found" });
+    }
+
+    res.json({ message: "Staff updated successfully" });
+  } catch (error) {
+   
+    res.status(500).json({ error: "Failed to update staff" });
+  }
+});
+
+
+// Delete staff by ID
+router.delete("/delete-staff/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [result] = await db.query("DELETE FROM staff WHERE id = ?", [id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Staff not found" });
+    }
+
+    res.json({ message: "Staff deleted successfully" });
+  } catch (error) {
+   
+    res.status(500).json({ error: "Failed to delete staff" });
   }
 });
 

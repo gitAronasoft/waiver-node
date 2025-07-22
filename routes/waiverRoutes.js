@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
     const [results] = await db.query('SELECT * FROM customers');
     res.json(results);
   } catch (err) {
-    console.error('DB Error:', err);
+    
     res.status(500).json({ error: 'Database error' });
   }
 });
@@ -53,7 +53,7 @@ router.post('/', async (req, res) => {
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
     await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
-    console.log(`✅ OTP for ${cell_phone} is: ${otp}`);
+ 
 
     // Step 5: Add to Mailchimp (ignore failure)
     try {
@@ -65,7 +65,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ message: 'Customer created and OTP sent', customer_id: customerId, otp });
   } catch (err) {
-    console.error('Error creating customer:', err);
+    
     res.status(500).json({ error: 'Error saving customer or minors' });
   }
 });
@@ -154,7 +154,7 @@ router.get('/customer-info', async (req, res) => {
 // ✅ Save Signature
 router.post('/save-signature', async (req, res) => {
   const { id, signature, minors = [] } = req.body;
-  console.log(minors, 'minors');
+
   if (!id || !signature)
     return res.status(400).json({ message: 'Missing ID or signature' });
 

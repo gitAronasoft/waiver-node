@@ -24,11 +24,11 @@ router.post('/send-otp', async (req, res) => {
     // Store OTP in DB
     await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [phone, otp, expiresAt]);
 
-    console.log(`✅ OTP for ${phone} is: ${otp}`); // Replace with SMS API in production
+
     //return res.json({ message: `✅ OTP sent successfully`, otp });
     return res.json({ message: `✅ OTP sent successfully: ${otp}` }); 
   } catch (error) {
-    console.error('Error in /send-otp:', error);
+
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -67,7 +67,7 @@ router.post('/verify-otp', async (req, res) => {
 
     return res.json({ message: 'OTP verified successfully', authenticated: true });
   } catch (error) {
-    console.error('Error in /verify-otp:', error);
+  
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
