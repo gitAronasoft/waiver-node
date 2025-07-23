@@ -1,8 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const nodemailer = require('nodemailer');
 const addToMailchimp = require('../utils/mailchimp');
 const db = require('../db/connection'); // Uses pool.promise()
 const { getCurrentESTTime } = require('../utils/time');
+const sendRatingEmail = require('../utils/sendRatingEmail');
+const sendRatingSMS = require('../utils/sendRatingSMS');
+
+const twilio = require('twilio');
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
 
 // ✅ GET all customers
 router.get('/', async (req, res) => {
@@ -50,10 +57,35 @@ router.post('/', async (req, res) => {
     }
 
     // Step 4: Generate OTP
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
- 
+    // const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    // const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    // await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
+    
+
+      // Step 4: Generate OTP
+      const otp = Math.floor(1000 + Math.random() * 9000).toString();
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+      await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
+
+      // ✅ Step 4.1: Send OTP via Twilio
+      let formattedPhone = cell_phone;
+      if (!formattedPhone.startsWith('+')) {
+        formattedPhone = `+1${cell_phone}`; // or use +91 for India
+      }
+
+      try {
+        const message = await client.messages.create({
+          body: `Your verification code for the Waiver App is ${otp}. It will expire in 5 minutes.`,
+          messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+          to: formattedPhone
+        });
+
+        console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
+      } catch (twilioError) {
+        console.error('❌ Twilio SMS error:', twilioError.message);
+        // You can optionally fail the request or continue anyway
+      }
+
 
     // Step 5: Add to Mailchimp (ignore failure)
     try {
@@ -152,6 +184,62 @@ router.get('/customer-info', async (req, res) => {
 
 
 // ✅ Save Signature
+// router.post('/save-signature', async (req, res) => {
+//   const { id, signature, minors = [] } = req.body;
+
+//   if (!id || !signature)
+//     return res.status(400).json({ message: 'Missing ID or signature' });
+
+//   try {
+//     await db.query(
+//       'UPDATE customers SET signature = ?, status = 1 WHERE id = ?',
+//       [signature, id]
+//     );
+
+//     // Update existing minors
+//     const existing = minors.filter(m => !m.isNew && m.id);
+//     for (let m of existing) {
+//       await db.query(
+//         'UPDATE minors SET status = ?, first_name = ?, last_name = ?, dob = ? WHERE id = ?',
+//         [m.checked ? 1 : 0, m.first_name, m.last_name, m.dob, m.id]
+//       );
+//     }
+
+//     // Insert new minors
+//     const newMinors = minors.filter(m => (!m.id || m.isNew) && m.checked);
+//     if (newMinors.length > 0) {
+//       const insertValues = newMinors.map(m => [
+//         id,
+//         m.first_name,
+//         m.last_name,
+//         m.dob,
+//         1,
+//       ]);
+//       await db.query(
+//         'INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?',
+//         [insertValues]
+//       );
+//     }
+
+//     // Save waiver form record
+//     const signedAtEST = getCurrentESTTime();
+//     await db.query(
+//       'INSERT INTO waiver_forms (user_id, signature_image, signed_at) VALUES (?, ?, ?)',
+//       [id, signature, signedAtEST]
+//     );
+
+//     res.json({
+//       message: 'Signature and waiver saved successfully',
+//       signed_at: signedAtEST,
+//     });
+//   } catch (err) {
+//     res
+//       .status(500)
+//       .json({ message: 'Error saving signature', error: err.message });
+//   }
+// });
+
+
 router.post('/save-signature', async (req, res) => {
   const { id, signature, minors = [] } = req.body;
 
@@ -159,51 +247,36 @@ router.post('/save-signature', async (req, res) => {
     return res.status(400).json({ message: 'Missing ID or signature' });
 
   try {
-    await db.query(
-      'UPDATE customers SET signature = ?, status = 1 WHERE id = ?',
-      [signature, id]
-    );
-
-    // Update existing minors
-    const existing = minors.filter(m => !m.isNew && m.id);
-    for (let m of existing) {
-      await db.query(
-        'UPDATE minors SET status = ?, first_name = ?, last_name = ?, dob = ? WHERE id = ?',
-        [m.checked ? 1 : 0, m.first_name, m.last_name, m.dob, m.id]
-      );
-    }
-
-    // Insert new minors
-    const newMinors = minors.filter(m => (!m.id || m.isNew) && m.checked);
-    if (newMinors.length > 0) {
-      const insertValues = newMinors.map(m => [
-        id,
-        m.first_name,
-        m.last_name,
-        m.dob,
-        1,
-      ]);
-      await db.query(
-        'INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?',
-        [insertValues]
-      );
-    }
-
-    // Save waiver form record
+    // Existing code to save signature and waiver
+    await db.query('UPDATE customers SET signature = ?, status = 1 WHERE id = ?', [signature, id]);
     const signedAtEST = getCurrentESTTime();
-    await db.query(
-      'INSERT INTO waiver_forms (user_id, signature_image, signed_at) VALUES (?, ?, ?)',
-      [id, signature, signedAtEST]
-    );
+    await db.query('INSERT INTO waiver_forms (user_id, signature_image, signed_at) VALUES (?, ?, ?)', [id, signature, signedAtEST]);
+
+    // Fetch customer details for automation
+    const [customerRows] = await db.query('SELECT * FROM customers WHERE id=?', [id]);
+    const customer = customerRows[0];
+
+    // Add to Mailchimp
+    // addToMailchimpList(customer.email, customer.first_name, customer.last_name);
+
+    // // Schedule rating email + SMS after 3 hours
+    setTimeout(async () => {
+      await sendRatingEmail(customer);
+      // await sendRatingSMS(customer);
+    }, 3 * 60 * 60 * 1000); // 3 hours in milliseconds
+
+//     setTimeout(async () => {
+//   await sendRatingEmail(customer);
+//   // await sendRatingSMS(customer);
+// }, 10 * 1000); // 10 seconds
+
 
     res.json({
       message: 'Signature and waiver saved successfully',
       signed_at: signedAtEST,
     });
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: 'Error saving signature', error: err.message });
+    res.status(500).json({ message: 'Error saving signature', error: err.message });
   }
 });
 
@@ -354,6 +427,64 @@ router.get('/waiver-details/:id', async (req, res) => {
     res.json({ customer: customers[0], minors, waiverHistory });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+
+// In your router file
+router.get('/rate/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [customers] = await db.query('SELECT first_name FROM customers WHERE id=?', [id]);
+    if (customers.length === 0) return res.status(404).json({ message: 'Customer not found' });
+
+    res.json({ first_name: customers[0].first_name });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// For saving feedback
+router.post('/feedback', async (req, res) => {
+  const { id, rating, message } = req.body;
+  try {
+    await db.query('INSERT INTO feedback (user_id, rating, message) VALUES (?, ?, ?)', [id, rating, message || ""]);
+    res.json({ message: 'Feedback saved successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+router.post('/send-feedback', async (req, res) => {
+  const { id, message } = req.body;
+  try {
+    const [customers] = await db.query('SELECT first_name, email FROM customers WHERE id=?', [id]);
+    if (customers.length === 0) return res.status(404).json({ message: 'Customer not found' });
+    const customer = customers[0];
+
+   const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        secure: true,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        },
+        tls: { rejectUnauthorized: false }
+      });
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      // to: 'info@skate-play.com', // Your support email
+        to: process.env.ADMIN_MAIL,
+      subject: `Customer Feedback - ${customer.first_name}`,
+      text: `Customer: ${customer.first_name} (${customer.email})\n\nFeedback:\n${message}`
+    });
+
+    res.json({ message: 'Feedback sent successfully' });
+  } catch (err) {
+    console.error('Feedback email error:', err.message);
+    res.status(500).json({ message: 'Failed to send feedback', error: err.message });
   }
 });
 

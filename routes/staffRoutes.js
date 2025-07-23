@@ -146,8 +146,8 @@ router.post('/forget-password', async (req, res) => {
     const resetLink = `${resetBase}/admin/reset-password?id=${encodedId}&email=${encodedEmail}`;
 
     const transporter = nodemailer.createTransport({
-      host: 'smtp.hostinger.com',
-      port: 465,
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
       secure: true,
       auth: {
         user: process.env.SMTP_USER,
@@ -198,7 +198,7 @@ router.post('/forget-password', async (req, res) => {
       `;
 
     const mailOptions = {
-      from: 'manjeet@aronasoft.com',
+      from: process.env.ADMIN_MAIL,
       to: email,
       subject: 'Reset Your Admin Password - Skate & Play',
       html: htmlTemplate
@@ -393,8 +393,8 @@ router.post("/addstaff", async (req, res) => {
     const loginLink = `${loginBase}/admin/login`;
 
     const transporter = nodemailer.createTransport({
-      host: "smtp.hostinger.com",
-      port: 465,
+      host: process.env.SMTP_HOST,
+      port:  process.env.SMTP_PORT,
       secure: true,
       auth: {
         user: process.env.SMTP_USER,
@@ -450,7 +450,7 @@ router.post("/addstaff", async (req, res) => {
     `;
 
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: process.env.ADMIN_MAIL,
       to: email,
       subject: "You're Invited to Skate & Play Admin Portal",
       html: htmlTemplate,

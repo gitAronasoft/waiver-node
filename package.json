@@ -21,10 +21,13 @@
     "fs": "^0.0.1-security",
     "jsonwebtoken": "^9.0.2",
     "moment-timezone": "^0.6.0",
+    "multer": "^2.0.2",
     "mysql2": "^3.14.1",
     "nodemailer": "^7.0.5",
+    "path": "^0.12.7",
     "pdfkit": "^0.17.1",
-    "puppeteer": "^24.12.1"
+    "puppeteer": "^24.12.1",
+    "twilio": "^5.7.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
