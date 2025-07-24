@@ -444,16 +444,50 @@ router.get('/rate/:id', async (req, res) => {
   }
 });
 
-// For saving feedback
-router.post('/feedback', async (req, res) => {
-  const { id, rating, message } = req.body;
+
+// POST /api/waivers/rate/:id
+router.post('/rate/:id', async (req, res) => {
+  const { rating } = req.body;
+  const { id } = req.params;
+
   try {
-    await db.query('INSERT INTO feedback (user_id, rating, message) VALUES (?, ?, ?)', [id, rating, message || ""]);
-    res.json({ message: 'Feedback saved successfully' });
+    // Insert new feedback row
+    await db.query('INSERT INTO feedback (user_id, rating) VALUES (?, ?)', [id, rating]);
+    res.json({ message: 'Rating saved' });
+  } catch (error) {
+    console.error('Rating save error:', error);
+    res.status(500).json({ error: 'Failed to save rating' });
+  }
+});
+
+
+
+// For saving feedback
+// router.post('/feedback', async (req, res) => {
+//   const { id, rating, message } = req.body;
+//   try {
+//     await db.query('INSERT INTO feedback (user_id, rating, message) VALUES (?, ?, ?)', [id, rating, message || ""]);
+//     res.json({ message: 'Feedback saved successfully' });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+
+// Update message only
+router.post('/feedback', async (req, res) => {
+  const { id, message } = req.body;
+  try {
+    await db.query(
+      'UPDATE feedback SET message = ? WHERE user_id = ?',
+      [message, id]
+    );
+    res.json({ message: 'Feedback message saved successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
 router.post('/send-feedback', async (req, res) => {
