@@ -435,10 +435,13 @@ router.get('/waiver-details/:id', async (req, res) => {
 router.get('/rate/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const [customers] = await db.query('SELECT first_name FROM customers WHERE id=?', [id]);
+    const [customers] = await db.query('SELECT first_name, last_name FROM customers WHERE id=?', [id]);
     if (customers.length === 0) return res.status(404).json({ message: 'Customer not found' });
 
-    res.json({ first_name: customers[0].first_name });
+    res.json({ 
+      first_name: customers[0].first_name,
+      last_name: customers[0].last_name
+     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -475,50 +478,208 @@ router.post('/rate/:id', async (req, res) => {
 
 
 // Update message only
+// router.post('/feedback', async (req, res) => {
+//   const { id, message } = req.body;
+//   try {
+//     await db.query(
+//       'UPDATE feedback SET message = ? WHERE user_id = ?',
+//       [message, id]
+//     );
+//     res.json({ message: 'Feedback message saved successfully' });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+
+// router.post('/send-feedback', async (req, res) => {
+//   const { id, message } = req.body;
+//   try {
+//     const [customers] = await db.query('SELECT first_name, email FROM customers WHERE id=?', [id]);
+//     if (customers.length === 0) return res.status(404).json({ message: 'Customer not found' });
+//     const customer = customers[0];
+
+//    const transporter = nodemailer.createTransport({
+//         host: process.env.SMTP_HOST,
+//         port: process.env.SMTP_PORT,
+//         secure: true,
+//         auth: {
+//           user: process.env.SMTP_USER,
+//           pass: process.env.SMTP_PASS
+//         },
+//         tls: { rejectUnauthorized: false }
+//       });
+//     await transporter.sendMail({
+//       from: process.env.SMTP_USER,
+//       // to: 'info@skate-play.com', // Your support email
+//         to: process.env.SMTP_USER,
+//       subject: `Customer Feedback - ${customer.first_name}`,
+//       text: `Customer: ${customer.first_name} (${customer.email})\n\nFeedback:\n${message}`
+//     });
+
+//     res.json({ message: 'Feedback sent successfully' });
+//   } catch (err) {
+//     console.error('Feedback email error:', err.message);
+//     res.status(500).json({ message: 'Failed to send feedback', error: err.message });
+//   }
+// });
+
 router.post('/feedback', async (req, res) => {
-  const { id, message } = req.body;
+  const { id, issue, staffName, message } = req.body;
+
+  if (!id || !message) {
+    return res.status(400).json({ error: "Missing required fields." });
+  }
+
   try {
-    await db.query(
-      'UPDATE feedback SET message = ? WHERE user_id = ?',
-      [message, id]
+    const [existing] = await db.query(
+      'SELECT id FROM feedback WHERE user_id = ?',
+      [id]
     );
-    res.json({ message: 'Feedback message saved successfully' });
+
+    if (existing.length > 0) {
+      // Update existing feedback
+      await db.query(
+        `UPDATE feedback 
+         SET issue = ?, staff_name = ?, message = ?, created_at = CURRENT_TIMESTAMP 
+         WHERE user_id = ?`,
+        [issue || null, staffName || null, message, id]
+      );
+
+      return res.json({ message: "Feedback updated successfully." });
+    } else {
+      // Insert new feedback
+      await db.query(
+        'INSERT INTO feedback (user_id, issue, staff_name, message) VALUES (?, ?, ?, ?)',
+        [id, issue || null, staffName || null, message]
+      );
+
+      return res.json({ message: "Feedback saved successfully." });
+    }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Error saving/updating feedback:", err);
+    return res.status(500).json({ error: "Failed to process feedback." });
   }
 });
-
-
 
 router.post('/send-feedback', async (req, res) => {
   const { id, message } = req.body;
   try {
-    const [customers] = await db.query('SELECT first_name, email FROM customers WHERE id=?', [id]);
+    const [customers] = await db.query('SELECT first_name, last_name, email FROM customers WHERE id=?', [id]);
     if (customers.length === 0) return res.status(404).json({ message: 'Customer not found' });
     const customer = customers[0];
 
-   const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
-        secure: true,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        },
-        tls: { rejectUnauthorized: false }
-      });
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      },
+      tls: { rejectUnauthorized: false }
+    });
+
+    const htmlTemplate = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Customer Feedback</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 0; margin: 0;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td align="center" style="padding: 40px 0;">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                <tr>
+                  <td style="background-color: #002244; color: white; padding: 20px; text-align: center;">
+                    <h2>Customer Feedback</h2>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 30px;">
+                    <p><strong>Customer:</strong> ${customer.first_name} ${customer.last_name}</p>
+                    <p><strong>Email:</strong> ${customer.email}</p>
+                    <p><strong>Feedback:</strong></p>
+                    <p style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; color: #333;">${message}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center; background-color: #f1f1f1; padding: 10px; font-size: 12px; color: #888;">
+                    &copy; 2025 Skate & Play. All rights reserved.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
     await transporter.sendMail({
       from: process.env.SMTP_USER,
-      // to: 'info@skate-play.com', // Your support email
-        to: process.env.ADMIN_MAIL,
-      subject: `Customer Feedback - ${customer.first_name}`,
-      text: `Customer: ${customer.first_name} (${customer.email})\n\nFeedback:\n${message}`
+      to: process.env.SMTP_USER, // or 'info@skate-play.com'
+      subject: `Customer Feedback - ${customer.first_name} ${customer.last_name}`,
+      html: htmlTemplate
     });
 
     res.json({ message: 'Feedback sent successfully' });
   } catch (err) {
     console.error('Feedback email error:', err.message);
     res.status(500).json({ message: 'Failed to send feedback', error: err.message });
+  }
+});
+
+
+// router.post('/send-feedback', async (req, res) => {
+//   const { id, message } = req.body;
+//   try {
+//     const [customers] = await db.query('SELECT first_name, email FROM customers WHERE id=?', [id]);
+//     if (customers.length === 0) return res.status(404).json({ message: 'Customer not found' });
+//     const customer = customers[0];
+
+//    const transporter = nodemailer.createTransport({
+//         host: process.env.SMTP_HOST,
+//         port: process.env.SMTP_PORT,
+//         secure: true,
+//         auth: {
+//           user: process.env.SMTP_USER,
+//           pass: process.env.SMTP_PASS
+//         },
+//         tls: { rejectUnauthorized: false }
+//       });
+//     await transporter.sendMail({
+//       from: process.env.SMTP_USER,
+//       // to: 'info@skate-play.com', // Your support email
+//         to: process.env.SMTP_USER,
+//       subject: `Customer Feedback - ${customer.first_name}`,
+//       text: `Customer: ${customer.first_name} (${customer.email})\n\nFeedback:\n${message}`
+//     });
+
+//     res.json({ message: 'Feedback sent successfully' });
+//   } catch (err) {
+//     console.error('Feedback email error:', err.message);
+//     res.status(500).json({ message: 'Failed to send feedback', error: err.message });
+//   }
+// });
+
+
+
+// backend/routes/feedback.js
+router.get('/getfeedback', async (req, res) => {
+  try {
+    const [feedback] = await db.query(`
+      SELECT f.*, c.first_name, c.last_name 
+      FROM feedback f 
+      JOIN customers c ON f.user_id = c.id 
+      ORDER BY f.created_at DESC
+    `);
+    res.json(feedback);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to fetch feedback' });
   }
 });
 

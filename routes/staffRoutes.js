@@ -198,7 +198,7 @@ router.post('/forget-password', async (req, res) => {
       `;
 
     const mailOptions = {
-      from: process.env.ADMIN_MAIL,
+      from: process.env.SMTP_USER,
       to: email,
       subject: 'Reset Your Admin Password - Skate & Play',
       html: htmlTemplate
@@ -248,7 +248,10 @@ router.post('/update-password', async (req, res) => {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    await db.query('UPDATE staff SET password = ? WHERE id = ? AND email = ?', [hashedPassword, id, email]);
+          await db.query(
+          'UPDATE staff SET status = 1, password = ? WHERE id = ? AND email = ?',
+          [hashedPassword, id, email]
+        );
 
     const [rows] = await db.query('SELECT id, name, email FROM staff WHERE id = ? AND email = ?', [id, email]);
     if (rows.length === 0) return res.status(404).send('Staff not found.');
@@ -365,6 +368,107 @@ router.get('/getstaff', async (req, res) => {
 
 
 
+// router.post("/addstaff", async (req, res) => {
+//   try {
+//     const { name, email, role } = req.body;
+//     if (!name || !email || !role) {
+//       return res.status(400).json({ error: "Name, email, and role are required" });
+//     }
+
+//     // Check if email already exists
+//     const [existing] = await db.query("SELECT id FROM staff WHERE email = ?", [email]);
+//     if (existing.length > 0) {
+//       return res.status(400).json({ error: "Email already exists" });
+//     }
+
+//     // Generate a temporary password
+//     const tempPassword = Math.random().toString(36).slice(-8); // Example: ab12cd34
+//     const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+//     // Insert staff into database
+//     await db.query(
+//       "INSERT INTO staff (name, email, password, role, status) VALUES (?, ?, ?, ?, ?)",
+//       [name, email, hashedPassword, role, 0]
+//     );
+
+//     // Send invitation email
+//     const loginBase = process.env.REACT_LINK_BASE || "http://localhost:3000";
+//     const loginLink = `${loginBase}/admin/login`;
+
+//     const transporter = nodemailer.createTransport({
+//       host: process.env.SMTP_HOST,
+//       port:  process.env.SMTP_PORT,
+//       secure: true,
+//       auth: {
+//         user: process.env.SMTP_USER,
+//         pass: process.env.SMTP_PASS,
+//       },
+//       tls: { rejectUnauthorized: false },
+//     });
+
+//     const htmlTemplate = `
+//       <!DOCTYPE html>
+//       <html>
+//       <head>
+//         <meta charset="UTF-8">
+//         <title>Welcome to Skate & Play</title>
+//       </head>
+//       <body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 0; margin: 0;">
+//         <table width="100%" cellpadding="0" cellspacing="0">
+//           <tr>
+//             <td align="center" style="padding: 40px 0;">
+//               <table width="600" cellpadding="0" cellspacing="0" style="background-color: #fff; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+//                 <tr>
+//                   <td style="background-color: #002244; color: white; padding: 20px; text-align: center;">
+//                     <h2>Skate & Play Admin Portal</h2>
+//                   </td>
+//                 </tr>
+//                 <tr>
+//                   <td style="padding: 30px;">
+//                     <p>Hi ${name},</p>
+//                     <p>You have been invited to join the Skate & Play admin portal as <b>${role == 1 ? "Admin" : "Staff"}</b>.</p>
+//                     <p>Your login details are:</p>
+//                     <ul>
+//                       <li><b>Email:</b> ${email}</li>
+//                       <li><b>Temporary Password:</b> ${tempPassword}</li>
+//                     </ul>
+//                     <p style="text-align: center; margin: 30px 0;">
+//                       <a href="${loginLink}" style="background-color: #007bff; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px;">Login Now</a>
+//                     </p>
+//                     <p>Please change your password after first login for security purposes.</p>
+//                     <p>Welcome aboard!<br/>Skate & Play Admin Team</p>
+//                   </td>
+//                 </tr>
+//                 <tr>
+//                   <td style="text-align: center; background-color: #f1f1f1; padding: 10px; font-size: 12px; color: #888;">
+//                     &copy; 2025 Skate & Play. All rights reserved.
+//                   </td>
+//                 </tr>
+//               </table>
+//             </td>
+//           </tr>
+//         </table>
+//       </body>
+//       </html>
+//     `;
+
+//     const mailOptions = {
+//       from: process.env.SMTP_USER,
+//       to: email,
+//       subject: "You're Invited to Skate & Play Admin Portal",
+//       html: htmlTemplate,
+//     };
+
+//     await transporter.sendMail(mailOptions);
+
+//     res.json({ message: "Staff added successfully. Invitation email sent." });
+//   } catch (error) {
+   
+//     res.status(500).json({ error: "Failed to add staff" });
+//   }
+// });
+
+
 router.post("/addstaff", async (req, res) => {
   try {
     const { name, email, role } = req.body;
@@ -378,23 +482,25 @@ router.post("/addstaff", async (req, res) => {
       return res.status(400).json({ error: "Email already exists" });
     }
 
-    // Generate a temporary password
-    const tempPassword = Math.random().toString(36).slice(-8); // Example: ab12cd34
-    const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
-    // Insert staff into database
-    await db.query(
-      "INSERT INTO staff (name, email, password, role, status) VALUES (?, ?, ?, ?, ?)",
-      [name, email, hashedPassword, role, 0]
+    // Insert staff into database with empty password for now
+    const [result] = await db.query(
+      "INSERT INTO staff (name, email,  role) VALUES (?, ?,?)",
+      [name, email, role]
     );
 
-    // Send invitation email
-    const loginBase = process.env.REACT_LINK_BASE || "http://localhost:3000";
-    const loginLink = `${loginBase}/admin/login`;
+    const insertedId = result.insertId;
 
+    // Generate password setup link
+     const encodedId = Buffer.from(insertedId.toString()).toString('base64');
+    const encodedEmail = Buffer.from(email).toString('base64');
+    const resetBase = process.env.REACT_LINK_BASE || 'http://localhost:3000';
+    const setupLink = `${resetBase}/admin/reset-password?id=${encodedId}&email=${encodedEmail}`;
+
+
+    // Setup nodemailer
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port:  process.env.SMTP_PORT,
+      port: process.env.SMTP_PORT,
       secure: true,
       auth: {
         user: process.env.SMTP_USER,
@@ -403,6 +509,7 @@ router.post("/addstaff", async (req, res) => {
       tls: { rejectUnauthorized: false },
     });
 
+    // HTML email template with "Set Up Your Account" link
     const htmlTemplate = `
       <!DOCTYPE html>
       <html>
@@ -424,15 +531,12 @@ router.post("/addstaff", async (req, res) => {
                   <td style="padding: 30px;">
                     <p>Hi ${name},</p>
                     <p>You have been invited to join the Skate & Play admin portal as <b>${role == 1 ? "Admin" : "Staff"}</b>.</p>
-                    <p>Your login details are:</p>
-                    <ul>
-                      <li><b>Email:</b> ${email}</li>
-                      <li><b>Temporary Password:</b> ${tempPassword}</li>
-                    </ul>
+                    <p>Click the button below to set your account password:</p>
                     <p style="text-align: center; margin: 30px 0;">
-                      <a href="${loginLink}" style="background-color: #007bff; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px;">Login Now</a>
+                      <a href="${setupLink}" target="_blank" style="background-color: #f19d39; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px;">
+                        Set Up Your Account
+                      </a>
                     </p>
-                    <p>Please change your password after first login for security purposes.</p>
                     <p>Welcome aboard!<br/>Skate & Play Admin Team</p>
                   </td>
                 </tr>
@@ -450,17 +554,17 @@ router.post("/addstaff", async (req, res) => {
     `;
 
     const mailOptions = {
-      from: process.env.ADMIN_MAIL,
+      from: process.env.SMTP_USER,
       to: email,
-      subject: "You're Invited to Skate & Play Admin Portal",
+      subject: "Set Up Your Skate & Play Admin Account",
       html: htmlTemplate,
     };
 
     await transporter.sendMail(mailOptions);
 
-    res.json({ message: "Staff added successfully. Invitation email sent." });
+    res.json({ message: "Staff added successfully. Setup email sent." });
   } catch (error) {
-   
+    console.error(error);
     res.status(500).json({ error: "Failed to add staff" });
   }
 });
@@ -550,6 +654,8 @@ router.delete("/delete-staff/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete staff" });
   }
 });
+
+
 
 
 module.exports = router;
