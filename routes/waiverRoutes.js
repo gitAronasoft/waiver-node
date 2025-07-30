@@ -64,7 +64,7 @@ router.post('/', async (req, res) => {
 
       // Step 4: Generate OTP
       const otp = Math.floor(1000 + Math.random() * 9000).toString();
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+       const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
       await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
 
       // ✅ Step 4.1: Send OTP via Twilio
@@ -80,7 +80,7 @@ router.post('/', async (req, res) => {
           to: formattedPhone
         });
 
-        console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
+        // console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
       } catch (twilioError) {
         console.error('❌ Twilio SMS error:', twilioError.message);
         // You can optionally fail the request or continue anyway
@@ -262,7 +262,7 @@ router.post('/save-signature', async (req, res) => {
     // // Schedule rating email + SMS after 3 hours
     setTimeout(async () => {
       await sendRatingEmail(customer);
-      // await sendRatingSMS(customer);
+      await sendRatingSMS(customer);
     }, 3 * 60 * 60 * 1000); // 3 hours in milliseconds
 
 //     setTimeout(async () => {

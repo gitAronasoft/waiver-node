@@ -62,12 +62,12 @@ router.post('/send-otp', async (req, res) => {
       formattedPhone = `+1${phone}`; // Change +1 to your country code
     }
 
-    // const message = await client.messages.create({
-    //   body: `Your OTP for completing the waiver is ${otp}. It is valid for 5 minutes.`,
+    const message = await client.messages.create({
+      body: `Your OTP for completing the waiver is ${otp}. It is valid for 5 minutes.`,
 
-    //   messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
-    //   to: formattedPhone
-    // });
+      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+      to: formattedPhone
+    });
 
     // console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
     return res.json({ message: `OTP sent successfully` });
@@ -81,6 +81,7 @@ router.post('/send-otp', async (req, res) => {
 // ✅ Verify OTP
 router.post('/verify-otp', async (req, res) => {
   const { phone, otp } = req.body;
+
 
   if (!phone || !otp) {
     return res.status(400).json({ message: 'Phone and OTP are required' });
@@ -98,6 +99,7 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     const savedOtp = results[0];
+   
 
     if (savedOtp.otp !== otp) {
       return res.status(400).json({ message: 'Invalid OTP' });
