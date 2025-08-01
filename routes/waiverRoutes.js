@@ -369,14 +369,36 @@ router.get('/getAllCustomers', async (req, res) => {
 });
 
 // ✅ Verify waiver
+// router.post('/verify/:waiverId', async (req, res) => {
+  
+//   try {
+//     await db.query('UPDATE waiver_forms SET verified_by_staff=1 WHERE id=?', [req.params.waiverId]);
+//     res.json({ message: 'Waiver verified successfully' });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
 router.post('/verify/:waiverId', async (req, res) => {
+  const { staff_id } = req.body;
+  const waiverId = req.params.waiverId;
+
+  if (!staff_id) {
+    return res.status(400).json({ error: 'Missing staff_id' });
+  }
+
   try {
-    await db.query('UPDATE waiver_forms SET verified_by_staff=1 WHERE id=?', [req.params.waiverId]);
+    await db.query(
+      'UPDATE waiver_forms SET staff_id = ?, verified_by_staff = 1 WHERE id = ?',
+      [staff_id, waiverId]
+    );
     res.json({ message: 'Waiver verified successfully' });
   } catch (err) {
+    console.error('Error updating waiver:', err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // ✅ Get all waivers
 router.get('/getallwaivers', async (req, res) => {

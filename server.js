@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require('express'); 
 const bodyParser = require('body-parser');
 const path = require("path");
 const cors = require('cors');
@@ -12,24 +12,18 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-
 app.use(bodyParser.json());
 
-// Allow serving uploaded images
+// ✅ Serve everything inside "public" folder (like CSS, images, etc.)
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ✅ Serve uploaded files from /public/uploads at /uploads URL
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
 // Routes
 app.use('/waivers', waiverRoutes);
-
-
 app.use('/auth', authRoutes);
-
-
 app.use('/staff', staffRoutes);
-
-
-
-
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
