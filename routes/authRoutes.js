@@ -63,8 +63,7 @@ router.post('/send-otp', async (req, res) => {
     }
 
     const message = await client.messages.create({
-      body: `Your OTP for completing the waiver is ${otp}. It is valid for 5 minutes.`,
-
+      body: `Your verification code for the Skate & Playis ${otp}. It will expire in 5 minutes.`,
       messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
       to: formattedPhone
     });
