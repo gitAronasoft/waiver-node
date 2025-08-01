@@ -19,13 +19,13 @@ app.use(bodyParser.json());
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
 // Routes
-app.use('/api/waivers', waiverRoutes);
+app.use('/waivers', waiverRoutes);
 
 
-app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
 
 
-app.use('/api/staff', staffRoutes);
+app.use('/staff', staffRoutes);
 
 
 
