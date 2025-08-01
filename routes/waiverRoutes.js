@@ -75,12 +75,12 @@ router.post('/', async (req, res) => {
 
       try {
         const message = await client.messages.create({
-          body: `Your verification code for the Waiver App is ${otp}. It will expire in 5 minutes.`,
+          body: `Your verification code for the Skate & Playis ${otp}. It will expire in 5 minutes.`,
           messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
           to: formattedPhone
         });
 
-        // console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
+        console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
       } catch (twilioError) {
         console.error('❌ Twilio SMS error:', twilioError.message);
         // You can optionally fail the request or continue anyway

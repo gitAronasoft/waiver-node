@@ -69,8 +69,10 @@ router.post('/send-otp', async (req, res) => {
       to: formattedPhone
     });
 
-    // console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
-    return res.json({ message: `OTP sent successfully` });
+     console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
+
+    // return res.json({ message: `OTP sent successfully` });
+    return res.json({ message: `✅ OTP sent successfully OTP: ${otp}` });
   } catch (error) {
     console.error('❌ Error in /send-otp:', error);
     return res.status(500).json({ error: 'Internal server error' });
