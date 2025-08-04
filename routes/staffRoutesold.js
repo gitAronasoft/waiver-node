@@ -70,7 +70,7 @@ router.post("/update-profile", upload.single("profileImage"), async (req, res) =
       staff: updatedAdmin[0],
     });
   } catch (err) {
-      console.log(err);
+  
     return res.status(500).json({ error: "Server error" });
   }
 });
@@ -207,7 +207,7 @@ router.post('/forget-password', async (req, res) => {
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Password reset link sent to your email' });
   } catch (err) {
-   console.log(err);
+   
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -560,18 +560,9 @@ router.post("/addstaff", async (req, res) => {
       html: htmlTemplate,
     };
 
-    // await transporter.sendMail(mailOptions);
-     try {
-      await transporter.sendMail(mailOptions);
-      res.json({ message: "Staff added successfully. Setup email sent." });
-    } catch (emailError) {
-      console.error("❌ Email sending failed:", emailError);
-      // Rollback inserted staff
-      await db.query("DELETE FROM staff WHERE id = ?", [insertedId]);
-      return res.status(500).json({ error: "Email sending failed. Staff not added." });
-    }
+    await transporter.sendMail(mailOptions);
 
-    // res.json({ message: "Staff added successfully. Setup email sent." });
+    res.json({ message: "Staff added successfully. Setup email sent." });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to add staff" });

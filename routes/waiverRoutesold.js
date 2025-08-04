@@ -67,50 +67,24 @@ router.post('/', async (req, res) => {
        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
       await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
 
-      // // ✅ Step 4.1: Send OTP via Twilio
-      // let formattedPhone = cell_phone;
-      // if (!formattedPhone.startsWith('+')) {
-      //   formattedPhone = `+1${cell_phone}`; // or use +91 for India
-      // }
+      // ✅ Step 4.1: Send OTP via Twilio
+      let formattedPhone = cell_phone;
+      if (!formattedPhone.startsWith('+')) {
+        formattedPhone = `+1${cell_phone}`; // or use +91 for India
+      }
 
-      // try {
-      //   const message = await client.messages.create({
-      //     body: `Your verification code for the Skate & Playis ${otp}. It will expire in 5 minutes.`,
-      //     messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
-      //     to: formattedPhone
-      //   });
+      try {
+        const message = await client.messages.create({
+          body: `Your verification code for the Skate & Playis ${otp}. It will expire in 5 minutes.`,
+          messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+          to: formattedPhone
+        });
 
-      //   console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
-      // } catch (twilioError) {
-      //   console.error('❌ Twilio SMS error:', twilioError.message);
-      //   // You can optionally fail the request or continue anyway
-      // }
-
-
-
-      // Step 4.1: Send OTP via Twilio
-            let formattedPhone = cell_phone;
-            if (!formattedPhone.startsWith('+')) {
-              formattedPhone = `+1${cell_phone}`; // or use appropriate country code
-            }
-
-            try {
-              const message = await client.messages.create({
-                body: `Your verification code for the Skate & Play is ${otp}. It will expire in 5 minutes.`,
-                messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
-                to: formattedPhone
-              });
-
-              console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
-            } catch (twilioError) {
-              console.error('❌ Twilio SMS error:', twilioError.message);
-
-              // 🔁 Cleanup: Delete inserted minors and customer
-              // await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
-              // await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
-
-              return res.status(500).json({ error: 'Failed to send OTP. Please check the phone number and try again.' });
-            }
+        console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
+      } catch (twilioError) {
+        console.error('❌ Twilio SMS error:', twilioError.message);
+        // You can optionally fail the request or continue anyway
+      }
 
 
     // Step 5: Add to Mailchimp (ignore failure)
@@ -123,7 +97,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ message: 'Customer created and OTP sent', customer_id: customerId, otp });
   } catch (err) {
-     console.error("Server Error:", err);
+    
     res.status(500).json({ error: 'Error saving customer or minors' });
   }
 });
