@@ -34,7 +34,7 @@ async function sendRatingEmail(customer) {
               </tr>
               <tr>
                 <td style="padding: 30px;">
-                  <p>Hi ${customer.first_name},</p>
+                  <p>Hi ${customer.first_name} ${customer.last_name},</p>
                   <p>Thanks again for visiting Skate & Play (and EXIT Lounge if you stopped by)! We’d love to know how your experience was.</p>
                   <p style="text-align: center; margin: 30px 0;">
                     <a href="${ratingLink}" style="background-color: #007bff; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px;">👉 Click to Rate</a><br>

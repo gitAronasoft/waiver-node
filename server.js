@@ -5,6 +5,7 @@ const cors = require('cors');
 const waiverRoutes = require('./routes/waiverRoutes');
 const authRoutes = require('./routes/authRoutes');
 const staffRoutes = require('./routes/staffRoutes');
+require('./ratingEmailScheduler');
 
 require('dotenv').config();
 

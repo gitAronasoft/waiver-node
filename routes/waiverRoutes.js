@@ -23,15 +23,132 @@ router.get('/', async (req, res) => {
 });
 
 // ✅ POST: Create customer, minors, send OTP
+// router.post('/', async (req, res) => {
+//   const {
+//     first_name, last_name, middle_initial, email, dob, age, address, city,
+//     province, postal_code, home_phone, cell_phone, work_phone, can_email,
+//     minors = []
+//   } = req.body;
+
+//   try {
+//     // Step 1: Check duplicate phone
+//     const [existing] = await db.query('SELECT * FROM customers WHERE cell_phone = ?', [cell_phone]);
+//     if (existing.length > 0) {
+//       return res.status(409).json({ error: 'Phone number already exists' });
+//     }
+
+//     // Step 2: Insert customer
+//     const customerSql = `
+//       INSERT INTO customers (
+//         first_name, last_name, middle_initial, email, dob, age, address, city,
+//         province, postal_code, home_phone, cell_phone, work_phone, can_email
+//       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+//     `;
+//     const [customerResult] = await db.query(customerSql, [
+//       first_name, last_name, middle_initial, email, dob, age, address, city,
+//       province, postal_code, home_phone, cell_phone, work_phone, can_email ? 1 : 0
+//     ]);
+//     const customerId = customerResult.insertId;
+
+//     // Step 3: Insert minors
+//     if (Array.isArray(minors) && minors.length > 0) {
+//       const minorValues = minors.map(m => [customerId, m.first_name, m.last_name, m.dob]);
+//       await db.query('INSERT INTO minors (customer_id, first_name, last_name, dob) VALUES ?', [minorValues]);
+//     }
+
+//     // Step 4: Generate OTP
+//     // const otp = Math.floor(1000 + Math.random() * 9000).toString();
+//     // const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+//     // await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
+    
+
+//       // Step 4: Generate OTP
+//       const otp = Math.floor(1000 + Math.random() * 9000).toString();
+//        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+//       await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
+
+//       // // ✅ Step 4.1: Send OTP via Twilio
+//       // let formattedPhone = cell_phone;
+//       // if (!formattedPhone.startsWith('+')) {
+//       //   formattedPhone = `+1${cell_phone}`; // or use +91 for India
+//       // }
+
+//       // try {
+//       //   const message = await client.messages.create({
+//       //     body: `Your verification code for the Skate & Playis ${otp}. It will expire in 5 minutes.`,
+//       //     messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+//       //     to: formattedPhone
+//       //   });
+
+//       //   console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
+//       // } catch (twilioError) {
+//       //   console.error('❌ Twilio SMS error:', twilioError.message);
+//       //   // You can optionally fail the request or continue anyway
+//       // }
+
+
+
+//       // Step 4.1: Send OTP via Twilio
+//             let formattedPhone = cell_phone;
+//             if (!formattedPhone.startsWith('+')) {
+//               formattedPhone = `+1${cell_phone}`; // or use appropriate country code
+//             }
+
+//             try {
+//               const message = await client.messages.create({
+//                 body: `Your verification code for the Skate & Play is ${otp}. It will expire in 5 minutes.`,
+//                 messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+//                 to: formattedPhone
+//               });
+
+//               console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
+//             } catch (twilioError) {
+//               console.error('❌ Twilio SMS error:', twilioError.message);
+
+//               // 🔁 Cleanup: Delete inserted minors and customer
+//               // await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
+//               // await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
+
+//               return res.status(500).json({ error: 'Failed to send OTP. Please check the phone number and try again.' });
+//             }
+
+
+//     // Step 5: Add to Mailchimp (ignore failure)
+//     try {
+//      await addToMailchimp(email, cell_phone, first_name, last_name, dob, city, address);
+
+//     } catch (mailchimpErr) {
+//       console.error('Mailchimp error:', mailchimpErr.message);
+//     }
+
+//     res.status(201).json({ message: 'Customer created and OTP sent', customer_id: customerId, otp });
+//   } catch (err) {
+//      console.error("Server Error:", err);
+//     res.status(500).json({ error: 'Error saving customer or minors' });
+//   }
+// });
+
+
 router.post('/', async (req, res) => {
+  // const {
+  //   first_name, last_name, middle_initial, email, dob, age,
+  //   address, city, province, postal_code,
+  //   home_phone, cell_phone, work_phone,
+  //   can_email, minors = []
+  // } = req.body;
+
   const {
-    first_name, last_name, middle_initial, email, dob, age, address, city,
-    province, postal_code, home_phone, cell_phone, work_phone, can_email,
-    minors = []
-  } = req.body;
+  first_name, last_name, middle_initial, email, dob, age,
+  address, city, province, postal_code,
+  home_phone, cell_phone, work_phone,
+  can_email, minors = [], send_otp = true
+} = req.body;
+
+
+  console.log(can_email);
 
   try {
-    // Step 1: Check duplicate phone
+    // Step 1: Check if phone already exists
     const [existing] = await db.query('SELECT * FROM customers WHERE cell_phone = ?', [cell_phone]);
     if (existing.length > 0) {
       return res.status(409).json({ error: 'Phone number already exists' });
@@ -50,83 +167,187 @@ router.post('/', async (req, res) => {
     ]);
     const customerId = customerResult.insertId;
 
-    // Step 3: Insert minors
+    // Step 3: Insert minors (if any)
     if (Array.isArray(minors) && minors.length > 0) {
       const minorValues = minors.map(m => [customerId, m.first_name, m.last_name, m.dob]);
       await db.query('INSERT INTO minors (customer_id, first_name, last_name, dob) VALUES ?', [minorValues]);
     }
 
-    // Step 4: Generate OTP
-    // const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    // const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    // await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
-    
+    // Step 4: Generate OTP and store it
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+    await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
 
-      // Step 4: Generate OTP
-      const otp = Math.floor(1000 + Math.random() * 9000).toString();
-       const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-      await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
+    // Step 5: Send OTP
+    // if (!can_email) {
+    //   // ✅ Send via Twilio SMS
+    //   let formattedPhone = cell_phone;
+    //   if (!formattedPhone.startsWith('+')) {
+    //     formattedPhone = `+1${cell_phone}`; // Or +91 for India
+    //   }
 
-      // // ✅ Step 4.1: Send OTP via Twilio
-      // let formattedPhone = cell_phone;
-      // if (!formattedPhone.startsWith('+')) {
-      //   formattedPhone = `+1${cell_phone}`; // or use +91 for India
-      // }
+    //   try {
+    //     const message = await client.messages.create({
+    //       body: `Your verification code for Skate & Play is ${otp}. It will expire in 5 minutes.`,
+    //       messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+    //       to: formattedPhone
+    //     });
 
-      // try {
-      //   const message = await client.messages.create({
-      //     body: `Your verification code for the Skate & Playis ${otp}. It will expire in 5 minutes.`,
-      //     messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
-      //     to: formattedPhone
-      //   });
+    //     console.log(`✅ OTP sent via SMS to ${formattedPhone}. SID: ${message.sid}`);
+    //   } catch (twilioError) {
+    //     console.error('❌ SMS failed:', twilioError.message);
 
-      //   console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
-      // } catch (twilioError) {
-      //   console.error('❌ Twilio SMS error:', twilioError.message);
-      //   // You can optionally fail the request or continue anyway
-      // }
+    //     // Cleanup: Remove inserted records
+    //     await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
+    //     await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
+
+    //     return res.status(500).json({ error: 'Failed to send OTP via SMS. Please check the phone number.' });
+    //   }
+    // } else {
+    //   // ✅ Send via Email using nodemailer
+    //   try {
+    //     const transporter = nodemailer.createTransport({
+    //       host: process.env.SMTP_HOST,
+    //       port: process.env.SMTP_PORT,
+    //       secure: true,
+    //       auth: {
+    //         user: process.env.SMTP_USER,
+    //         pass: process.env.SMTP_PASS,
+    //       },
+    //     });
+
+    //     const mailOptions = {
+    //       from: process.env.SMTP_USER,
+    //       to: email,
+    //       subject: 'Your Skate & Play OTP Code',
+    //       text: `Your verification code is ${otp}. It will expire in 5 minutes.`,
+    //     };
+
+    //     await transporter.sendMail(mailOptions);
+    //     console.log(`✅ OTP sent to email: ${email}`);
+    //   } catch (emailErr) {
+    //     console.error('❌ Email failed:', emailErr.message);
+
+    //     // Cleanup: Remove inserted records
+    //     await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
+    //     await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
+
+    //     return res.status(500).json({ error: 'Failed to send OTP via email. Please check the address.' });
+    //   }
+    // }
+
+
+    // Step 5: Send OTP
+if (send_otp) {
+  // ✅ Send via Twilio SMS
+  let formattedPhone = cell_phone;
+  if (!formattedPhone.startsWith('+')) {
+    formattedPhone = `+1${cell_phone}`; // Or +91 for India
+  }
+
+  try {
+    const message = await client.messages.create({
+      body: `Your verification code for Skate & Play is ${otp}. It will expire in 5 minutes.`,
+      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+      to: formattedPhone
+    });
+
+    console.log(`✅ OTP sent via SMS to ${formattedPhone}. SID: ${message.sid}`);
+  } catch (twilioError) {
+    console.error('❌ SMS failed:', twilioError.message);
+      await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
+    await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
+     return res.status(500).json({ error: 'Failed to send OTP. Please check the phone number and try again.' });
+  }
+} else {
+  // ✅ Send via email using nodemailer + HTML template
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT),
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      tls: {
+        rejectUnauthorized: false // Avoid cert errors (Zoho workaround)
+      }
+    });
+
+    const htmlTemplate = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Skate & Play OTP</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 30px;">
+        <table align="center" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background-color: #002244; color: #ffffff; padding: 20px; text-align: center;">
+              <h2>Skate & Play</h2>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 30px; color: #333333;">
+              <h3>Hello ${first_name},</h3>
+              <p>Thank you for signing up. Your One-Time Passcode (OTP) is:</p>
+              <div style="font-size: 28px; font-weight: bold; background-color: #f1f1f1; padding: 20px; text-align: center; border-radius: 6px; margin: 20px 0;">
+                ${otp}
+              </div>
+              <p>This code will expire in <strong>5 minutes</strong>. Please enter it to verify your identity.</p>
+              <p>If you didn't request this code, you can ignore this email.</p>
+              <p>Thanks,<br>The Skate & Play Team</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f0f0f0; text-align: center; padding: 10px; font-size: 12px; color: #777;">
+              &copy; 2025 Skate & Play. All rights reserved.
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    await transporter.sendMail({
+      from: `"Skate & Play" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: 'Your OTP Code for Skate & Play',
+      html: htmlTemplate,
+    });
+
+    console.log(`✅ OTP sent to email: ${email}`);
+  } catch (emailErr) {
+    console.error('❌ Email failed:', emailErr.message);
+
+    // Cleanup: Remove inserted records
+    await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
+    await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
+
+    return res.status(500).json({ error: 'Failed to send OTP via email. Please check the address.' });
+  }
+}
 
 
 
-      // Step 4.1: Send OTP via Twilio
-            let formattedPhone = cell_phone;
-            if (!formattedPhone.startsWith('+')) {
-              formattedPhone = `+1${cell_phone}`; // or use appropriate country code
-            }
-
-            try {
-              const message = await client.messages.create({
-                body: `Your verification code for the Skate & Play is ${otp}. It will expire in 5 minutes.`,
-                messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
-                to: formattedPhone
-              });
-
-              console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
-            } catch (twilioError) {
-              console.error('❌ Twilio SMS error:', twilioError.message);
-
-              // 🔁 Cleanup: Delete inserted minors and customer
-              // await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
-              // await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
-
-              return res.status(500).json({ error: 'Failed to send OTP. Please check the phone number and try again.' });
-            }
-
-
-    // Step 5: Add to Mailchimp (ignore failure)
+    // Step 6: Optional - Add to Mailchimp
     try {
-     await addToMailchimp(email, cell_phone, first_name, last_name, dob, city, address);
-
-    } catch (mailchimpErr) {
-      console.error('Mailchimp error:', mailchimpErr.message);
+      await addToMailchimp(email, cell_phone, first_name, last_name, dob, city, address);
+    } catch (err) {
+      console.error('⚠️ Mailchimp error:', err.message);
     }
 
+    // Step 7: Final response
     res.status(201).json({ message: 'Customer created and OTP sent', customer_id: customerId, otp });
+
   } catch (err) {
-     console.error("Server Error:", err);
-    res.status(500).json({ error: 'Error saving customer or minors' });
+    console.error("❌ Server Error:", err);
+    res.status(500).json({ error: 'Server error saving customer or minors' });
   }
 });
+
 
 // ✅ GET customer info with minors
 router.get('/customer-info', async (req, res) => {
@@ -279,22 +500,23 @@ router.post('/save-signature', async (req, res) => {
     await db.query('INSERT INTO waiver_forms (user_id, signature_image, signed_at) VALUES (?, ?, ?)', [id, signature, signedAtEST]);
 
     // Fetch customer details for automation
-    const [customerRows] = await db.query('SELECT * FROM customers WHERE id=?', [id]);
-    const customer = customerRows[0];
+    // const [customerRows] = await db.query('SELECT * FROM customers WHERE id=?', [id]);
+    // const customer = customerRows[0];
 
     // Add to Mailchimp
     // addToMailchimpList(customer.email, customer.first_name, customer.last_name);
 
     // // Schedule rating email + SMS after 3 hours
-    setTimeout(async () => {
-      await sendRatingEmail(customer);
-      await sendRatingSMS(customer);
-    }, 3 * 60 * 60 * 1000); // 3 hours in milliseconds
+    // setTimeout(async () => {
+    //   await sendRatingEmail(customer);
+    //   await sendRatingSMS(customer);
+    // }, 3 * 60 * 60 * 1000); // 3 hours in milliseconds
 
 //     setTimeout(async () => {
 //   await sendRatingEmail(customer);
 //   // await sendRatingSMS(customer);
-// }, 10 * 1000); // 10 seconds
+// },  1 * 60 * 60 * 1000); // 10 seconds
+
 
 
     res.json({
@@ -405,20 +627,40 @@ router.get('/getAllCustomers', async (req, res) => {
 //   }
 // });
 
+// router.post('/verify/:waiverId', async (req, res) => {
+//   const { staff_id } = req.body;
+//   const waiverId = req.params.waiverId;
+
+//   if (!staff_id) {
+//     return res.status(400).json({ error: 'Missing staff_id' });
+//   }
+
+//   try {
+//     await db.query(
+//       'UPDATE waiver_forms SET staff_id = ?, verified_by_staff = 1 WHERE id = ?',
+//       [staff_id, waiverId]
+//     );
+//     res.json({ message: 'Waiver verified successfully' });
+//   } catch (err) {
+//     console.error('Error updating waiver:', err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
 router.post('/verify/:waiverId', async (req, res) => {
-  const { staff_id } = req.body;
+  const { staff_id, verified_by_staff } = req.body;
   const waiverId = req.params.waiverId;
 
-  if (!staff_id) {
-    return res.status(400).json({ error: 'Missing staff_id' });
+  if (!staff_id || ![1, 2].includes(verified_by_staff)) {
+    return res.status(400).json({ error: 'Invalid staff_id or verification value' });
   }
 
   try {
     await db.query(
-      'UPDATE waiver_forms SET staff_id = ?, verified_by_staff = 1 WHERE id = ?',
-      [staff_id, waiverId]
+      'UPDATE waiver_forms SET staff_id = ?, verified_by_staff = ? WHERE id = ?',
+      [staff_id, verified_by_staff, waiverId]
     );
-    res.json({ message: 'Waiver verified successfully' });
+    res.json({ message: 'Waiver verification status updated successfully' });
   } catch (err) {
     console.error('Error updating waiver:', err);
     res.status(500).json({ error: err.message });
@@ -426,11 +668,12 @@ router.post('/verify/:waiverId', async (req, res) => {
 });
 
 
+
 // ✅ Get all waivers
 router.get('/getallwaivers', async (req, res) => {
   try {
     const [waivers] = await db.query(`
-      SELECT c.*, w.id AS waiver_id, w.signed_at, w.verified_by_staff AS status
+      SELECT c.*, w.id AS waiver_id, DATE_FORMAT(w.signed_at, '%b %d, %Y at %h:%i %p') AS signed_at, w.verified_by_staff AS status
       FROM customers c
       JOIN waiver_forms w ON w.user_id=c.id
       ORDER BY w.signed_at DESC
@@ -503,8 +746,12 @@ router.post('/rate/:id', async (req, res) => {
 
   try {
     // Insert new feedback row
-    await db.query('INSERT INTO feedback (user_id, rating) VALUES (?, ?)', [id, rating]);
-    res.json({ message: 'Rating saved' });
+   const [result] =  await db.query('INSERT INTO feedback (user_id, rating) VALUES (?, ?)', [id, rating]);
+     // Get the inserted feedback ID (assuming you're using MySQL or MariaDB)
+    const feedbackId = result.insertId;
+
+    res.json({ message: 'Rating saved', feedbackId });
+    // res.json({ message: 'Rating saved' });
   } catch (error) {
     console.error('Rating save error:', error);
     res.status(500).json({ error: 'Failed to save rating' });
@@ -572,48 +819,78 @@ router.post('/rate/:id', async (req, res) => {
 //   }
 // });
 
-router.post('/feedback', async (req, res) => {
-  const { id, issue, staffName, message } = req.body;
+// router.post('/feedback', async (req, res) => {
+//   const { id, issue, staffName, message, } = req.body;
 
-  if (!id || !message) {
+//   if (!id || !message) {
+//     return res.status(400).json({ error: "Missing required fields." });
+//   }
+
+//   try {
+//     const [existing] = await db.query(
+//       'SELECT id FROM feedback WHERE user_id = ?',
+//       [id]
+//     );
+
+//     if (existing.length > 0) {
+//       // Update existing feedback
+//       await db.query(
+//         `UPDATE feedback 
+//          SET issue = ?, staff_name = ?, message = ?, created_at = CURRENT_TIMESTAMP 
+//          WHERE user_id = ?`,
+//         [issue || null, staffName || null, message, id]
+//       );
+
+//       return res.json({ message: "Feedback updated successfully." });
+//     } else {
+//       // Insert new feedback
+//       await db.query(
+//         'INSERT INTO feedback (user_id, issue, staff_name, message) VALUES (?, ?, ?, ?)',
+//         [id, issue || null, staffName || null, message]
+//       );
+
+//       return res.json({ message: "Feedback saved successfully." });
+//     }
+//   } catch (err) {
+//     console.error("Error saving/updating feedback:", err);
+//     return res.status(500).json({ error: "Failed to process feedback." });
+//   }
+// });
+
+router.post('/feedback', async (req, res) => {
+  const { userId, feedbackId, issue, staffName, message } = req.body;
+
+  if (!feedbackId || !message) {
     return res.status(400).json({ error: "Missing required fields." });
   }
 
   try {
-    const [existing] = await db.query(
-      'SELECT id FROM feedback WHERE user_id = ?',
-      [id]
+    const [existing] = await db.query('SELECT * FROM feedback WHERE id = ?', [feedbackId]);
+
+    if (existing.length === 0) {
+      return res.status(404).json({ error: "Feedback not found." });
+    }
+
+    await db.query(
+      `UPDATE feedback 
+       SET issue = ?, staff_name = ?, message = ?, created_at = CURRENT_TIMESTAMP 
+       WHERE id = ?`,
+      [issue || null, staffName || null, message, feedbackId] // ✅ single array of values
     );
 
-    if (existing.length > 0) {
-      // Update existing feedback
-      await db.query(
-        `UPDATE feedback 
-         SET issue = ?, staff_name = ?, message = ?, created_at = CURRENT_TIMESTAMP 
-         WHERE user_id = ?`,
-        [issue || null, staffName || null, message, id]
-      );
-
-      return res.json({ message: "Feedback updated successfully." });
-    } else {
-      // Insert new feedback
-      await db.query(
-        'INSERT INTO feedback (user_id, issue, staff_name, message) VALUES (?, ?, ?, ?)',
-        [id, issue || null, staffName || null, message]
-      );
-
-      return res.json({ message: "Feedback saved successfully." });
-    }
+    return res.json({ message: "Feedback updated successfully.", feedbackId });
   } catch (err) {
-    console.error("Error saving/updating feedback:", err);
-    return res.status(500).json({ error: "Failed to process feedback." });
+    console.error("Error updating feedback:", err);
+    return res.status(500).json({ error: "Failed to update feedback." });
   }
 });
 
+
 router.post('/send-feedback', async (req, res) => {
-  const { id, message } = req.body;
+  // const { userId, message } = req.body;
+    const { userId, feedbackId, issue, staffName, message } = req.body;
   try {
-    const [customers] = await db.query('SELECT first_name, last_name, email FROM customers WHERE id=?', [id]);
+    const [customers] = await db.query('SELECT first_name, last_name, email FROM customers WHERE id=?', [userId]);
     if (customers.length === 0) return res.status(404).json({ message: 'Customer not found' });
     const customer = customers[0];
 
@@ -650,7 +927,9 @@ router.post('/send-feedback', async (req, res) => {
                     <p><strong>Customer:</strong> ${customer.first_name} ${customer.last_name}</p>
                     <p><strong>Email:</strong> ${customer.email}</p>
                     <p><strong>Feedback:</strong></p>
-                    <p style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; color: #333;">${message}</p>
+  <p style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; color: #333;">Issue: ${issue || "N/A"}</p>
+  <p style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; color: #333;">Staff Name: ${staffName || "N/A"}</p>
+  <p style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; color: #333;">Comments: ${message || "N/A"}</p>
                   </td>
                 </tr>
                 <tr>
@@ -730,5 +1009,50 @@ router.get('/getfeedback', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch feedback' });
   }
 });
+
+// Delete waiver
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  console.log(id,'id');
+  try {
+    await db.query('DELETE FROM waiver_forms WHERE id = ?', [id]);
+    res.json({ message: 'Waiver deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete waiver' });
+  }
+});
+
+// Unconfirm waiver
+// router.put('/:id/unconfirm', async (req, res) => {
+//   const { id } = req.params;
+//   try {
+//     await db.query('UPDATE waiver_forms SET verified_by_staff = 0 WHERE id = ?', [id]);
+//     res.json({ message: 'Waiver unconfirmed successfully' });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: 'Failed to unconfirm waiver' });
+//   }
+// });
+
+// Toggle waiver status (confirm/unconfirm)
+router.put('/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (![0, 1].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status value' });
+  }
+
+  try {
+    await db.query('UPDATE waiver_forms SET verified_by_staff = ? WHERE id = ?', [status, id]);
+    res.json({ message: 'Waiver status updated successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update waiver status' });
+  }
+});
+
+
 
 module.exports = router;
