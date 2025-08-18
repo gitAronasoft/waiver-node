@@ -63,7 +63,8 @@ router.post('/send-otp', async (req, res) => {
     }
 
     const message = await client.messages.create({
-      body: `Your OTP for completing the waiver is ${otp}. It is valid for 5 minutes.`,
+      // body: `Your OTP for completing the waiver is ${otp}. It is valid for 5 minutes.`,
+       body: `Your verification code is ${otp} for your Skate & Play waiver. Enjoy your roller skating session.`,
 
       messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
       to: formattedPhone
@@ -71,8 +72,8 @@ router.post('/send-otp', async (req, res) => {
 
      console.log(`✅ OTP sent to ${formattedPhone}. Twilio SID: ${message.sid}`);
 
-    // return res.json({ message: `OTP sent successfully` });
-    return res.json({ message: `✅ OTP sent successfully OTP: ${otp}` });
+    return res.json({ message: `OTP sent successfully` });
+    // return res.json({ message: `✅ OTP sent successfully OTP: ${otp}` });
   } catch (error) {
     console.error('❌ Error in /send-otp:', error);
     return res.status(500).json({ error: 'Internal server error' });

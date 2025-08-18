@@ -247,7 +247,8 @@ if (send_otp) {
 
   try {
     const message = await client.messages.create({
-      body: `Your verification code for Skate & Play is ${otp}. It will expire in 5 minutes.`,
+      // body: `Your verification code for Skate & Play is ${otp}. It will expire in 5 minutes.`,
+      body: `Your verification code is ${otp} for your Skate & Play waiver. Enjoy your roller skating session.`,
       messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
       to: formattedPhone
     });
@@ -670,25 +671,68 @@ router.post('/verify/:waiverId', async (req, res) => {
 
 
 // ✅ Get all waivers
+// router.get('/getallwaivers', async (req, res) => {
+//   try {
+//     const [waivers] = await db.query(`
+//       SELECT c.*, w.id AS waiver_id, DATE_FORMAT(w.signed_at, '%b %d, %Y at %h:%i %p') AS signed_at, w.verified_by_staff AS status
+//       FROM customers c
+//       JOIN waiver_forms w ON w.user_id=c.id
+//       ORDER BY w.signed_at DESC
+//     `);
+
+//     for (let w of waivers) {
+//       const [minors] = await db.query('SELECT * FROM minors WHERE customer_id=? AND status=1', [w.id]);
+//       w.minors = minors;
+//     }
+
+//     res.json(waivers);
+//   } catch (err) {
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// });
+
+
 router.get('/getallwaivers', async (req, res) => {
   try {
-    const [waivers] = await db.query(`
-      SELECT c.*, w.id AS waiver_id, DATE_FORMAT(w.signed_at, '%b %d, %Y at %h:%i %p') AS signed_at, w.verified_by_staff AS status
+    const [rows] = await db.query(`
+      SELECT 
+        c.id AS customer_id,
+        c.first_name, 
+        c.last_name, 
+        c.cell_phone, 
+        w.id AS waiver_id, 
+        DATE_FORMAT(w.signed_at, '%b %d, %Y at %h:%i %p') AS signed_at, 
+        w.verified_by_staff AS status,
+        GROUP_CONCAT(
+          CONCAT(m.first_name, '::', m.last_name) 
+          SEPARATOR '||'
+        ) AS minors
       FROM customers c
-      JOIN waiver_forms w ON w.user_id=c.id
+      JOIN waiver_forms w ON w.user_id = c.id
+      LEFT JOIN minors m ON m.customer_id = c.id AND m.status = 1
+      GROUP BY w.id
       ORDER BY w.signed_at DESC
     `);
 
-    for (let w of waivers) {
-      const [minors] = await db.query('SELECT * FROM minors WHERE customer_id=? AND status=1', [w.id]);
-      w.minors = minors;
-    }
+    // Parse minors into array
+    const waivers = rows.map(r => ({
+      ...r,
+      id: r.customer_id, // 🔹 unify with frontend expectation
+      minors: r.minors 
+        ? r.minors.split('||').map(n => {
+            const [first_name, last_name] = n.split('::');
+            return { first_name, last_name };
+          })
+        : []
+    }));
 
     res.json(waivers);
   } catch (err) {
+    console.error("Error fetching waivers:", err);
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 // ✅ Waiver details by ID
 router.get('/waiver-details/:id', async (req, res) => {
