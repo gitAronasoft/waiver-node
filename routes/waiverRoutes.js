@@ -701,6 +701,8 @@ router.get('/getallwaivers', async (req, res) => {
         c.last_name, 
         c.cell_phone, 
         w.id AS waiver_id, 
+        w.rating_email_sent,
+        w.rating_sms_sent,
         DATE_FORMAT(w.signed_at, '%b %d, %Y at %h:%i %p') AS signed_at, 
         w.verified_by_staff AS status,
         GROUP_CONCAT(
