@@ -128,30 +128,244 @@ router.get('/', async (req, res) => {
 //   }
 // });
 
+///  send opt with phnone and mail
+// router.post('/', async (req, res) => {
+//   // const {
+//   //   first_name, last_name, middle_initial, email, dob, age,
+//   //   address, city, province, postal_code,
+//   //   home_phone, cell_phone, work_phone,
+//   //   can_email, minors = []
+//   // } = req.body;
 
-router.post('/', async (req, res) => {
-  // const {
-  //   first_name, last_name, middle_initial, email, dob, age,
-  //   address, city, province, postal_code,
-  //   home_phone, cell_phone, work_phone,
-  //   can_email, minors = []
-  // } = req.body;
+//   const {
+//   first_name, last_name, middle_initial, email, dob, age,
+//   address, city, province, postal_code,
+//   home_phone, cell_phone, work_phone,
+//   can_email, minors = [], send_otp = true
+// } = req.body;
 
+
+//   console.log(can_email);
+
+//   try {
+//     // Step 1: Check if phone already exists
+//     const [existing] = await db.query('SELECT * FROM customers WHERE cell_phone = ?', [cell_phone]);
+//     if (existing.length > 0) {
+//       return res.status(409).json({ error: 'Phone number already exists' });
+//     }
+
+//     // Step 2: Insert customer
+//     const customerSql = `
+//       INSERT INTO customers (
+//         first_name, last_name, middle_initial, email, dob, age, address, city,
+//         province, postal_code, home_phone, cell_phone, work_phone, can_email
+//       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+//     `;
+//     const [customerResult] = await db.query(customerSql, [
+//       first_name, last_name, middle_initial, email, dob, age, address, city,
+//       province, postal_code, home_phone, cell_phone, work_phone, can_email ? 1 : 0
+//     ]);
+//     const customerId = customerResult.insertId;
+
+//     // Step 3: Insert minors (if any)
+//     if (Array.isArray(minors) && minors.length > 0) {
+//       const minorValues = minors.map(m => [customerId, m.first_name, m.last_name, m.dob]);
+//       await db.query('INSERT INTO minors (customer_id, first_name, last_name, dob) VALUES ?', [minorValues]);
+//     }
+
+//     // Step 4: Generate OTP and store it
+//     const otp = Math.floor(1000 + Math.random() * 9000).toString();
+//     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+//     await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
+
+//     // Step 5: Send OTP
+//     // if (!can_email) {
+//     //   // ✅ Send via Twilio SMS
+//     //   let formattedPhone = cell_phone;
+//     //   if (!formattedPhone.startsWith('+')) {
+//     //     formattedPhone = `+1${cell_phone}`; // Or +91 for India
+//     //   }
+
+//     //   try {
+//     //     const message = await client.messages.create({
+//     //       body: `Your verification code for Skate & Play is ${otp}. It will expire in 5 minutes.`,
+//     //       messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+//     //       to: formattedPhone
+//     //     });
+
+//     //     console.log(`✅ OTP sent via SMS to ${formattedPhone}. SID: ${message.sid}`);
+//     //   } catch (twilioError) {
+//     //     console.error('❌ SMS failed:', twilioError.message);
+
+//     //     // Cleanup: Remove inserted records
+//     //     await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
+//     //     await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
+
+//     //     return res.status(500).json({ error: 'Failed to send OTP via SMS. Please check the phone number.' });
+//     //   }
+//     // } else {
+//     //   // ✅ Send via Email using nodemailer
+//     //   try {
+//     //     const transporter = nodemailer.createTransport({
+//     //       host: process.env.SMTP_HOST,
+//     //       port: process.env.SMTP_PORT,
+//     //       secure: true,
+//     //       auth: {
+//     //         user: process.env.SMTP_USER,
+//     //         pass: process.env.SMTP_PASS,
+//     //       },
+//     //     });
+
+//     //     const mailOptions = {
+//     //       from: process.env.SMTP_USER,
+//     //       to: email,
+//     //       subject: 'Your Skate & Play OTP Code',
+//     //       text: `Your verification code is ${otp}. It will expire in 5 minutes.`,
+//     //     };
+
+//     //     await transporter.sendMail(mailOptions);
+//     //     console.log(`✅ OTP sent to email: ${email}`);
+//     //   } catch (emailErr) {
+//     //     console.error('❌ Email failed:', emailErr.message);
+
+//     //     // Cleanup: Remove inserted records
+//     //     await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
+//     //     await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
+
+//     //     return res.status(500).json({ error: 'Failed to send OTP via email. Please check the address.' });
+//     //   }
+//     // }
+
+
+//     // Step 5: Send OTP
+// if (send_otp) {
+//   // ✅ Send via Twilio SMS
+//   let formattedPhone = cell_phone;
+//   if (!formattedPhone.startsWith('+')) {
+//     formattedPhone = `+1${cell_phone}`; // Or +91 for India
+//   }
+
+//   try {
+//     const message = await client.messages.create({
+//       // body: `Your verification code for Skate & Play is ${otp}. It will expire in 5 minutes.`,
+//       body: `Your verification code is ${otp} for your Skate & Play waiver. Enjoy your roller skating session.`,
+//       messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+//       to: formattedPhone
+//     });
+
+//     console.log(`✅ OTP sent via SMS to ${formattedPhone}. SID: ${message.sid}`);
+//   } catch (twilioError) {
+//     console.error('❌ SMS failed:', twilioError.message);
+//       await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
+//     await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
+//      return res.status(500).json({ error: 'Failed to send OTP. Please check the phone number and try again.' });
+//   }
+// } else {
+//   // ✅ Send via email using nodemailer + HTML template
+//   try {
+//     const transporter = nodemailer.createTransport({
+//       host: process.env.SMTP_HOST,
+//       port: Number(process.env.SMTP_PORT),
+//       secure: true,
+//       auth: {
+//         user: process.env.SMTP_USER,
+//         pass: process.env.SMTP_PASS,
+//       },
+//       tls: {
+//         rejectUnauthorized: false // Avoid cert errors (Zoho workaround)
+//       }
+//     });
+
+//     const htmlTemplate = `
+//       <!DOCTYPE html>
+//       <html>
+//       <head>
+//         <meta charset="UTF-8">
+//         <title>Skate & Play OTP</title>
+//       </head>
+//       <body style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 30px;">
+//         <table align="center" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+//           <tr>
+//             <td style="background-color: #002244; color: #ffffff; padding: 20px; text-align: center;">
+//               <h2>Skate & Play</h2>
+//             </td>
+//           </tr>
+//           <tr>
+//             <td style="padding: 30px; color: #333333;">
+//               <h3>Hello ${first_name},</h3>
+//               <p>Thank you for signing up. Your One-Time Passcode (OTP) is:</p>
+//               <div style="font-size: 28px; font-weight: bold; background-color: #f1f1f1; padding: 20px; text-align: center; border-radius: 6px; margin: 20px 0;">
+//                 ${otp}
+//               </div>
+//               <p>This code will expire in <strong>5 minutes</strong>. Please enter it to verify your identity.</p>
+//               <p>If you didn't request this code, you can ignore this email.</p>
+//               <p>Thanks,<br>The Skate & Play Team</p>
+//             </td>
+//           </tr>
+//           <tr>
+//             <td style="background-color: #f0f0f0; text-align: center; padding: 10px; font-size: 12px; color: #777;">
+//               &copy; 2025 Skate & Play. All rights reserved.
+//             </td>
+//           </tr>
+//         </table>
+//       </body>
+//       </html>
+//     `;
+
+//     await transporter.sendMail({
+//       from: `"Skate & Play" <${process.env.SMTP_USER}>`,
+//       to: email,
+//       subject: 'Your OTP Code for Skate & Play',
+//       html: htmlTemplate,
+//     });
+
+//     console.log(`✅ OTP sent to email: ${email}`);
+//   } catch (emailErr) {
+//     console.error('❌ Email failed:', emailErr.message);
+
+//     // Cleanup: Remove inserted records
+//     await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
+//     await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
+
+//     return res.status(500).json({ error: 'Failed to send OTP via email. Please check the address.' });
+//   }
+// }
+
+
+
+//     // Step 6: Optional - Add to Mailchimp
+//     try {
+//       await addToMailchimp(email, cell_phone, first_name, last_name, dob, city, address);
+//     } catch (err) {
+//       console.error('⚠️ Mailchimp error:', err.message);
+//     }
+
+//     // Step 7: Final response
+//     res.status(201).json({ message: 'Customer created and OTP sent', customer_id: customerId, otp });
+
+//   } catch (err) {
+//     console.error("❌ Server Error:", err);
+//     res.status(500).json({ error: 'Server error saving customer or minors' });
+//   }
+// });
+
+
+router.post("/", async (req, res) => {
   const {
-  first_name, last_name, middle_initial, email, dob, age,
-  address, city, province, postal_code,
-  home_phone, cell_phone, work_phone,
-  can_email, minors = [], send_otp = true
-} = req.body;
-
-
-  console.log(can_email);
+    first_name, last_name, middle_initial, email, dob, age,
+    address, city, province, postal_code,
+    home_phone, cell_phone, work_phone,
+    can_email, minors = [], send_otp = true
+  } = req.body;
 
   try {
     // Step 1: Check if phone already exists
-    const [existing] = await db.query('SELECT * FROM customers WHERE cell_phone = ?', [cell_phone]);
+    const [existing] = await db.query(
+      "SELECT * FROM customers WHERE cell_phone = ?",
+      [cell_phone]
+    );
     if (existing.length > 0) {
-      return res.status(409).json({ error: 'Phone number already exists' });
+      return res.status(409).json({ error: "Phone number already exists" });
     }
 
     // Step 2: Insert customer
@@ -163,191 +377,98 @@ router.post('/', async (req, res) => {
     `;
     const [customerResult] = await db.query(customerSql, [
       first_name, last_name, middle_initial, email, dob, age, address, city,
-      province, postal_code, home_phone, cell_phone, work_phone, can_email ? 1 : 0
+      province, postal_code, home_phone, cell_phone, work_phone, can_email ? 1 : 0,
     ]);
     const customerId = customerResult.insertId;
 
     // Step 3: Insert minors (if any)
     if (Array.isArray(minors) && minors.length > 0) {
-      const minorValues = minors.map(m => [customerId, m.first_name, m.last_name, m.dob]);
-      await db.query('INSERT INTO minors (customer_id, first_name, last_name, dob) VALUES ?', [minorValues]);
+      const minorValues = minors.map((m) => [
+        customerId,
+        m.first_name,
+        m.last_name,
+        m.dob,
+      ]);
+      await db.query(
+        "INSERT INTO minors (customer_id, first_name, last_name, dob) VALUES ?",
+        [minorValues]
+      );
     }
 
-    // Step 4: Generate OTP and store it
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
-    await db.query('INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)', [cell_phone, otp, expiresAt]);
+    // Step 4 + 5: Generate OTP only if send_otp = true
+    let otp = null;
+    if (send_otp) {
+      otp = Math.floor(1000 + Math.random() * 9000).toString();
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    // Step 5: Send OTP
-    // if (!can_email) {
-    //   // ✅ Send via Twilio SMS
-    //   let formattedPhone = cell_phone;
-    //   if (!formattedPhone.startsWith('+')) {
-    //     formattedPhone = `+1${cell_phone}`; // Or +91 for India
-    //   }
+      await db.query(
+        "INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)",
+        [cell_phone, otp, expiresAt]
+      );
 
-    //   try {
-    //     const message = await client.messages.create({
-    //       body: `Your verification code for Skate & Play is ${otp}. It will expire in 5 minutes.`,
-    //       messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
-    //       to: formattedPhone
-    //     });
+      try {
+        // ✅ Send OTP via Twilio SMS
+        let formattedPhone = cell_phone;
+        if (!formattedPhone.startsWith("+")) {
+          formattedPhone = `+1${cell_phone}`; // adjust to +91 if India
+        }
 
-    //     console.log(`✅ OTP sent via SMS to ${formattedPhone}. SID: ${message.sid}`);
-    //   } catch (twilioError) {
-    //     console.error('❌ SMS failed:', twilioError.message);
+        const message = await client.messages.create({
+          body: `Your verification code is ${otp} for your Skate & Play waiver. Enjoy your roller skating session.`,
+          messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+          to: formattedPhone,
+        });
 
-    //     // Cleanup: Remove inserted records
-    //     await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
-    //     await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
+        console.log(
+          `✅ OTP sent via SMS to ${formattedPhone}. SID: ${message.sid}`
+        );
+      } catch (twilioError) {
+        console.error("❌ SMS failed:", twilioError.message);
 
-    //     return res.status(500).json({ error: 'Failed to send OTP via SMS. Please check the phone number.' });
-    //   }
-    // } else {
-    //   // ✅ Send via Email using nodemailer
-    //   try {
-    //     const transporter = nodemailer.createTransport({
-    //       host: process.env.SMTP_HOST,
-    //       port: process.env.SMTP_PORT,
-    //       secure: true,
-    //       auth: {
-    //         user: process.env.SMTP_USER,
-    //         pass: process.env.SMTP_PASS,
-    //       },
-    //     });
+        // Cleanup: Remove inserted records
+        await db.query("DELETE FROM minors WHERE customer_id = ?", [
+          customerId,
+        ]);
+        await db.query("DELETE FROM customers WHERE id = ?", [customerId]);
 
-    //     const mailOptions = {
-    //       from: process.env.SMTP_USER,
-    //       to: email,
-    //       subject: 'Your Skate & Play OTP Code',
-    //       text: `Your verification code is ${otp}. It will expire in 5 minutes.`,
-    //     };
-
-    //     await transporter.sendMail(mailOptions);
-    //     console.log(`✅ OTP sent to email: ${email}`);
-    //   } catch (emailErr) {
-    //     console.error('❌ Email failed:', emailErr.message);
-
-    //     // Cleanup: Remove inserted records
-    //     await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
-    //     await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
-
-    //     return res.status(500).json({ error: 'Failed to send OTP via email. Please check the address.' });
-    //   }
-    // }
-
-
-    // Step 5: Send OTP
-if (send_otp) {
-  // ✅ Send via Twilio SMS
-  let formattedPhone = cell_phone;
-  if (!formattedPhone.startsWith('+')) {
-    formattedPhone = `+1${cell_phone}`; // Or +91 for India
-  }
-
-  try {
-    const message = await client.messages.create({
-      // body: `Your verification code for Skate & Play is ${otp}. It will expire in 5 minutes.`,
-      body: `Your verification code is ${otp} for your Skate & Play waiver. Enjoy your roller skating session.`,
-      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
-      to: formattedPhone
-    });
-
-    console.log(`✅ OTP sent via SMS to ${formattedPhone}. SID: ${message.sid}`);
-  } catch (twilioError) {
-    console.error('❌ SMS failed:', twilioError.message);
-      await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
-    await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
-     return res.status(500).json({ error: 'Failed to send OTP. Please check the phone number and try again.' });
-  }
-} else {
-  // ✅ Send via email using nodemailer + HTML template
-  try {
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-      secure: true,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-      tls: {
-        rejectUnauthorized: false // Avoid cert errors (Zoho workaround)
+        return res.status(500).json({
+          error: "Failed to send OTP. Please check the phone number and try again.",
+        });
       }
-    });
+    }
 
-    const htmlTemplate = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Skate & Play OTP</title>
-      </head>
-      <body style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 30px;">
-        <table align="center" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="background-color: #002244; color: #ffffff; padding: 20px; text-align: center;">
-              <h2>Skate & Play</h2>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 30px; color: #333333;">
-              <h3>Hello ${first_name},</h3>
-              <p>Thank you for signing up. Your One-Time Passcode (OTP) is:</p>
-              <div style="font-size: 28px; font-weight: bold; background-color: #f1f1f1; padding: 20px; text-align: center; border-radius: 6px; margin: 20px 0;">
-                ${otp}
-              </div>
-              <p>This code will expire in <strong>5 minutes</strong>. Please enter it to verify your identity.</p>
-              <p>If you didn't request this code, you can ignore this email.</p>
-              <p>Thanks,<br>The Skate & Play Team</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #f0f0f0; text-align: center; padding: 10px; font-size: 12px; color: #777;">
-              &copy; 2025 Skate & Play. All rights reserved.
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `;
-
-    await transporter.sendMail({
-      from: `"Skate & Play" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: 'Your OTP Code for Skate & Play',
-      html: htmlTemplate,
-    });
-
-    console.log(`✅ OTP sent to email: ${email}`);
-  } catch (emailErr) {
-    console.error('❌ Email failed:', emailErr.message);
-
-    // Cleanup: Remove inserted records
-    await db.query('DELETE FROM minors WHERE customer_id = ?', [customerId]);
-    await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
-
-    return res.status(500).json({ error: 'Failed to send OTP via email. Please check the address.' });
-  }
-}
-
-
-
-    // Step 6: Optional - Add to Mailchimp
+    // Step 6: Optional - Add to Mailchimp (non-blocking)
     try {
-      await addToMailchimp(email, cell_phone, first_name, last_name, dob, city, address);
+      await addToMailchimp(
+        email,
+        cell_phone,
+        first_name,
+        last_name,
+        dob,
+        city,
+        address
+      );
     } catch (err) {
-      console.error('⚠️ Mailchimp error:', err.message);
+      console.error("⚠️ Mailchimp error:", err.message);
     }
 
     // Step 7: Final response
-    res.status(201).json({ message: 'Customer created and OTP sent', customer_id: customerId, otp });
-
+    res.status(201).json({
+      message: send_otp
+        ? "Customer created and OTP sent"
+        : "Customer created without OTP",
+      customer_id: customerId,
+      phone: cell_phone,
+      otp, // frontend will ignore this if send_otp = false
+    });
   } catch (err) {
     console.error("❌ Server Error:", err);
-    res.status(500).json({ error: 'Server error saving customer or minors' });
+    res
+      .status(500)
+      .json({ error: "Server error saving customer or minors" });
   }
 });
+
 
 
 // ✅ GET customer info with minors
@@ -518,7 +639,14 @@ router.post('/save-signature', async (req, res) => {
 //   // await sendRatingSMS(customer);
 // },  1 * 60 * 60 * 1000); // 10 seconds
 
-
+    const newMinors = minors.filter(m => m.isNew && m.checked);
+    if (newMinors.length > 0) {
+      const insertValues = newMinors.map(m => [id, m.first_name, m.last_name, m.dob, 1]);
+      await db.query(
+        'INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?',
+        [insertValues]
+      );
+    }
 
     res.json({
       message: 'Signature and waiver saved successfully',
