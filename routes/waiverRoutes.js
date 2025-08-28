@@ -10,6 +10,9 @@ const sendRatingSMS = require('../utils/sendRatingSMS');
 const twilio = require('twilio');
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
+const stripPhone = (phone) => (phone ? phone.replace(/\D/g, "") : "");
+
+
 
 // ✅ GET all customers
 router.get('/', async (req, res) => {
@@ -359,10 +362,14 @@ router.post("/", async (req, res) => {
   } = req.body;
 
   try {
+       // ✅ Clean phone numbers (remove mask characters)
+    const cleanHomePhone = stripPhone(home_phone);
+    const cleanCellPhone = stripPhone(cell_phone);
+    const cleanWorkPhone = stripPhone(work_phone);
     // Step 1: Check if phone already exists
     const [existing] = await db.query(
       "SELECT * FROM customers WHERE cell_phone = ?",
-      [cell_phone]
+      [cleanCellPhone]
     );
     if (existing.length > 0) {
       return res.status(409).json({ error: "Phone number already exists" });
@@ -377,7 +384,7 @@ router.post("/", async (req, res) => {
     `;
     const [customerResult] = await db.query(customerSql, [
       first_name, last_name, middle_initial, email, dob, age, address, city,
-      province, postal_code, home_phone, cell_phone, work_phone, can_email ? 1 : 0,
+      province, postal_code, cleanHomePhone, cleanCellPhone, cleanWorkPhone, can_email ? 1 : 0,
     ]);
     const customerId = customerResult.insertId;
 
@@ -403,7 +410,7 @@ router.post("/", async (req, res) => {
 
       await db.query(
         "INSERT INTO otps (phone, otp, expires_at) VALUES (?, ?, ?)",
-        [cell_phone, otp, expiresAt]
+        [cleanCellPhone, otp, expiresAt]
       );
 
       try {
