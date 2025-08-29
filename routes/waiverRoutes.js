@@ -355,17 +355,17 @@ router.get('/', async (req, res) => {
 
 router.post("/", async (req, res) => {
   const {
-    first_name, last_name, middle_initial, email, dob, age,
+    first_name, last_name,  email, dob, 
     address, city, province, postal_code,
-    home_phone, cell_phone, work_phone,
-    can_email, minors = [], send_otp = true
+     cell_phone, 
+     minors = [], send_otp = true
   } = req.body;
 
   try {
        // ✅ Clean phone numbers (remove mask characters)
-    const cleanHomePhone = stripPhone(home_phone);
+ 
     const cleanCellPhone = stripPhone(cell_phone);
-    const cleanWorkPhone = stripPhone(work_phone);
+ 
     // Step 1: Check if phone already exists
     const [existing] = await db.query(
       "SELECT * FROM customers WHERE cell_phone = ?",
@@ -378,13 +378,12 @@ router.post("/", async (req, res) => {
     // Step 2: Insert customer
     const customerSql = `
       INSERT INTO customers (
-        first_name, last_name, middle_initial, email, dob, age, address, city,
-        province, postal_code, home_phone, cell_phone, work_phone, can_email
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        first_name, last_name,  email, dob, address, city, province, postal_code, cell_phone 
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [customerResult] = await db.query(customerSql, [
-      first_name, last_name, middle_initial, email, dob, age, address, city,
-      province, postal_code, cleanHomePhone, cleanCellPhone, cleanWorkPhone, can_email ? 1 : 0,
+      first_name, last_name,  email, dob,  address, city,
+      province, postal_code,  cleanCellPhone,
     ]);
     const customerId = customerResult.insertId;
 
@@ -693,10 +692,10 @@ router.post('/update-customer', async (req, res) => {
   try {
     await db.query(`
       UPDATE customers SET 
-        first_name=?, last_name=?, middle_initial=?, email=?, dob=?, age=?,
-        address=?, city=?, province=?, postal_code=?, home_phone=?, cell_phone=?, work_phone=?, can_email=?
+        first_name=?, last_name=?,  email=?, dob=?, 
+        address=?, city=?, province=?, postal_code=?, cell_phone=?
       WHERE id=?
-    `, [first_name, last_name, middle_initial, email, dob, age, address, city, province, postal_code, home_phone, cell_phone, work_phone, can_email ? 1 : 0, id]);
+    `, [first_name, last_name,  email, dob, address, city, province, postal_code,  cell_phone, id]);
 
     for (let m of minors.filter(m => !m.isNew)) {
       await db.query('UPDATE minors SET status=? WHERE id=?', [m.checked ? 1 : 0, m.id]);
