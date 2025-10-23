@@ -40,7 +40,7 @@ const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TO
 
 router.post('/send-otp', async (req, res) => {
   // Just in case
-  const { phone } = req.body;
+  const { phone, cell_phone } = req.body;
 
   if (!phone) {
     return res.status(400).json({ message: 'Phone number is required' });
@@ -59,7 +59,7 @@ router.post('/send-otp', async (req, res) => {
 
     let formattedPhone = phone;
     if (!formattedPhone.startsWith('+')) {
-      formattedPhone = `+1${phone}`; // Change +1 to your country code
+      formattedPhone = `${cell_phone}`; // Change +1 to your country code
     }
 
     const message = await client.messages.create({

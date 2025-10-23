@@ -358,10 +358,11 @@ router.post("/", async (req, res) => {
     first_name, last_name,  email, dob, 
     address, city, province, postal_code,
      cell_phone, 
-     minors = [], send_otp = true
+     minors = [], send_otp = true,
+     country_code, cc_cell_phone
   } = req.body;
 
-  try {
+  try {  
        // ✅ Clean phone numbers (remove mask characters)
  
     const cleanCellPhone = stripPhone(cell_phone);
@@ -378,12 +379,12 @@ router.post("/", async (req, res) => {
     // Step 2: Insert customer
     const customerSql = `
       INSERT INTO customers (
-        first_name, last_name,  email, dob, address, city, province, postal_code, cell_phone 
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        first_name, last_name, email, dob, address, city, province, postal_code, cell_phone, country_code 
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [customerResult] = await db.query(customerSql, [
-      first_name, last_name,  email, dob,  address, city,
-      province, postal_code,  cleanCellPhone,
+      first_name, last_name, email, dob,  address, city,
+      province, postal_code, cleanCellPhone, country_code
     ]);
     const customerId = customerResult.insertId;
 
@@ -416,7 +417,7 @@ router.post("/", async (req, res) => {
         // ✅ Send OTP via Twilio SMS
         let formattedPhone = cell_phone;
         if (!formattedPhone.startsWith("+")) {
-          formattedPhone = `+1${cell_phone}`; // adjust to +91 if India
+          formattedPhone = cc_cell_phone; // adjust to +91 if India
         }
 
         const message = await client.messages.create({
